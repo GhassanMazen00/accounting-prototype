@@ -13,7 +13,7 @@ window.APP_CONFIG = {
 
   REVIEWER_USERNAME: "worker2",      // المراجِع
   VIEWER_USERNAME: "worker3",        // الاطّلاع فقط
-  SUPERVISOR_USERNAME: "odai",       // المشرف
+  SUPERVISOR_USERNAME: "worker0",    // المشرف
   BILLS_VIEWER_USERNAME: "worker4",  // عرض الفواتير فقط
 
   CAPTCHA_SITE_KEY: "",              // مُعطّل في النسخة التجريبية

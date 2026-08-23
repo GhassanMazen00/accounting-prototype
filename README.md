@@ -39,7 +39,7 @@ Password for every account is `1234`.
 | Username  | Role            | What it shows |
 |-----------|-----------------|---------------|
 | `manager` | المدير           | Full dashboard — clients, daily/monthly sales, activity, statements, all invoices, all payments, credit balances, cancelled invoices, login requests, active users |
-| `odai`    | المشرف          | The manager's dashboard in read-only mode (no add/edit/delete) |
+| `worker0` | المشرف          | The manager's dashboard in read-only mode (no add/edit/delete) |
 | `worker1` | موظف الإدخال     | Search customers, add invoices / payments / returns — all submitted for review |
 | `worker2` | المراجِع         | Approve or reject the entries submitted by data-entry staff |
 | `worker3` | مطّلِع           | Search-and-view only: customer balances, invoices, payments |
@@ -51,7 +51,7 @@ Password for every account is `1234`.
 2. **`worker2`** — approve that entry.
 3. **`manager`** — the invoice is now in the ledger; walk through the dashboard tabs.
 4. **`worker3` / `worker4`** — show the restricted read-only roles.
-5. **`odai`** — show the supervisor's read-only view of the full dashboard.
+5. **`worker0`** — show the supervisor's read-only view of the full dashboard.
 
 ---
 

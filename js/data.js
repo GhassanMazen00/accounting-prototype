@@ -10,7 +10,7 @@ const DB_KEY = "az_demo_db_v1";
 /* حسابات الدخول التجريبية — كلمة المرور واحدة للجميع: 1234 */
 const USERS = {
   "manager": { password: "1234", role: "manager",    name: "المدير" },
-  "odai":    { password: "1234", role: "supervisor", name: "المشرف" },
+  "worker0": { password: "1234", role: "supervisor", name: "المشرف" },
   "worker1": { password: "1234", role: "employee",   name: "موظف الإدخال" },
   "worker2": { password: "1234", role: "employee",   name: "المراجِع" },
   "worker3": { password: "1234", role: "employee",   name: "مطّلِع" },
@@ -20,7 +20,7 @@ const USERS = {
 /* وصف كل حساب — يُستخدم في بطاقة الدخول السريع بشاشة تسجيل الدخول */
 const DEMO_ACCOUNTS = [
   { user: "manager", label: "المدير",        desc: "لوحة كاملة: العملاء، المبيعات، الكشوف، الصلاحيات" },
-  { user: "odai",    label: "المشرف",        desc: "نفس لوحة المدير للاطّلاع فقط دون تعديل" },
+  { user: "worker0", label: "المشرف",        desc: "نفس لوحة المدير للاطّلاع فقط دون تعديل" },
   { user: "worker1", label: "موظف الإدخال",  desc: "يضيف الفواتير والدفعات وتُرسَل للمراجعة" },
   { user: "worker2", label: "المراجِع",      desc: "يعتمد أو يرفض إدخالات الموظفين" },
   { user: "worker3", label: "مطّلِع",        desc: "بحث واطّلاع على أرصدة العملاء فقط" },
