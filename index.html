@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AZ Accounting — نسخة تجريبية</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logo.svg" />
+  <script>
+    /* ضبط الوضع (فاتح/ليلي) مبكراً لتجنّب وميض الشاشة */
+    (function () {
+      try {
+        var t = localStorage.getItem("app_theme");
+        if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="css/styles.css?v=demo1" />
+</head>
+<body>
+
+  <!-- ===================== شاشة تسجيل الدخول ===================== -->
+  <section id="login-screen" class="login-screen">
+    <button id="login-theme-toggle" class="theme-toggle login-theme-toggle" aria-label="تبديل الوضع الليلي"></button>
+    <div class="login-card">
+      <h1>AZ Accounting</h1>
+      <p class="login-sub">الرجاء تسجيل الدخول للمتابعة</p>
+
+      <form id="login-form" autocomplete="off">
+        <label for="username">اسم المستخدم</label>
+        <input type="text" id="username" placeholder="اسم المستخدم" required />
+
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" placeholder="كلمة المرور" required />
+
+        <div id="captcha-box" class="captcha-box"></div>
+
+        <button type="submit" class="btn btn-primary btn-block">دخول</button>
+        <p id="login-error" class="login-error"></p>
+      </form>
+
+      <!-- بطاقة الدخول السريع (النسخة التجريبية فقط) -->
+      <div id="demo-accounts" class="demo-accounts"></div>
+    </div>
+  </section>
+
+  <!-- ===================== شاشة انتظار موافقة المدير ===================== -->
+  <section id="waiting-screen" class="login-screen hidden">
+    <div class="login-card">
+      <div class="approve-spinner"></div>
+      <h1>في انتظار موافقة المدير</h1>
+      <p class="login-sub">تم إرسال طلب دخولك. سيتمكّن المدير من الموافقة عليه للسماح لك بالدخول.</p>
+      <p class="demo-note">في النسخة التجريبية تتم الموافقة تلقائياً بعد لحظات لعرض هذه الخطوة.</p>
+      <button type="button" class="btn btn-outline btn-block" onclick="cancelWaiting()">إلغاء</button>
+    </div>
+  </section>
+
+  <!-- ===================== التطبيق ===================== -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="topbar-right">
+        <div class="brand">AZ Accounting</div>
+        <span class="demo-chip topbar-chip">نسخة تجريبية</span>
+      </div>
+      <div class="topbar-left">
+        <span id="current-user" class="current-user"></span>
+        <button id="demo-reset" class="btn btn-ghost" title="استرجاع البيانات التجريبية الأصلية">إعادة تعيين البيانات</button>
+        <button id="theme-toggle" class="theme-toggle" aria-label="تبديل الوضع الليلي"></button>
+        <button id="logout-btn" class="btn btn-ghost">تسجيل الخروج</button>
+      </div>
+    </header>
+
+    <!-- ===================== واجهة الموظف (worker1) ===================== -->
+    <main id="employee-view" class="view hidden">
+      <div class="container">
+        <nav class="tabs">
+          <button class="tab active" data-emp="add" onclick="empShow('add')">إضافة</button>
+          <button class="tab" data-emp="rejected" onclick="empShow('rejected')">المرفوضات <span id="rej-badge" class="tab-badge hidden">0</span></button>
+        </nav>
+
+        <div id="emp-add" class="emp-panel">
+          <div class="section-head">
+            <h2 class="page-title" style="margin:0">البحث عن عميل</h2>
+            <div class="btn-group">
+              <button class="btn btn-primary btn-sm" onclick="addCustomerForm()">+ إضافة عميل جديد</button>
+              <button class="btn btn-outline btn-sm" onclick="openCancelledForm()">+ فاتورة ملغية</button>
+            </div>
+          </div>
+
+          <div class="search-bar">
+            <input type="text" id="employee-search" placeholder="اكتب اسم العميل ثم اضغط بحث..." />
+            <button id="employee-search-btn" class="btn btn-primary">بحث</button>
+          </div>
+
+          <div id="employee-results" class="results"></div>
+        </div>
+
+        <div id="emp-rejected" class="emp-panel hidden"></div>
+      </div>
+    </main>
+
+    <!-- ===================== واجهة الاطّلاع فقط (worker3) ===================== -->
+    <main id="viewer-view" class="view hidden">
+      <div class="container">
+        <div id="viewer-search-panel">
+          <div class="section-head">
+            <h2 class="page-title" style="margin:0">البحث عن عميل</h2>
+          </div>
+          <div class="search-bar">
+            <input type="text" id="viewer-search" placeholder="اكتب اسم العميل ثم اضغط بحث..." />
+            <button id="viewer-search-btn" class="btn btn-primary">بحث</button>
+          </div>
+          <div id="viewer-results" class="results"></div>
+        </div>
+        <div id="viewer-profile-panel" class="hidden">
+          <button class="btn btn-outline btn-back" onclick="viewerBackToSearch()">↩ العودة إلى البحث</button>
+          <div id="viewer-profile-content"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ===================== واجهة عرض الفواتير فقط (worker4) ===================== -->
+    <main id="billsview-view" class="view hidden">
+      <div class="container">
+        <div id="bv-search-panel">
+          <div class="section-head">
+            <h2 class="page-title" style="margin:0">البحث عن عميل</h2>
+          </div>
+          <div class="search-bar">
+            <input type="text" id="bv-search" placeholder="اكتب اسم العميل ثم اضغط بحث..." />
+            <button id="bv-search-btn" class="btn btn-primary">بحث</button>
+          </div>
+          <div id="bv-results" class="results"></div>
+        </div>
+        <div id="bv-profile-panel" class="hidden">
+          <button class="btn btn-outline btn-back" onclick="billsViewBackToSearch()">↩ العودة إلى البحث</button>
+          <div id="bv-profile-content"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ===================== واجهة المراجِع (worker2) ===================== -->
+    <main id="review-view" class="view hidden">
+      <div class="container">
+        <div class="section-head">
+          <h2 class="page-title" style="margin:0">مراجعة إدخالات الموظفين</h2>
+        </div>
+        <div id="review-content"></div>
+      </div>
+    </main>
+
+    <!-- ===================== واجهة المدير ===================== -->
+    <main id="manager-view" class="view hidden">
+      <div class="container">
+        <nav class="tabs">
+          <button class="tab active" data-tab="clients">العملاء</button>
+          <button class="tab" data-tab="daily">المبيعات اليومية</button>
+          <button class="tab" data-tab="activity">الحركة اليومية</button>
+          <button class="tab" data-tab="monthly">المبيعات الشهرية</button>
+          <button class="tab" data-tab="statement">كشف الحسابات</button>
+          <button class="tab" data-tab="allbills">جميع الفواتير</button>
+          <button class="tab hidden" data-tab="allpays">جميع الدفعات والحركات</button>
+          <button class="tab" data-tab="credit">الأرصدة الدائنة</button>
+          <button class="tab" data-tab="cancelled">الفواتير الملغية</button>
+          <button class="tab" data-tab="rejected">المرفوضات</button>
+          <button class="tab" data-tab="requests">طلبات الدخول <span id="req-badge" class="tab-badge hidden">0</span></button>
+          <button class="tab" data-tab="users">المستخدمون</button>
+        </nav>
+
+        <div id="tab-clients" class="tab-panel active"></div>
+        <div id="tab-daily" class="tab-panel"></div>
+        <div id="tab-activity" class="tab-panel"></div>
+        <div id="tab-monthly" class="tab-panel"></div>
+        <div id="tab-statement" class="tab-panel"></div>
+        <div id="tab-allbills" class="tab-panel"></div>
+        <div id="tab-allpays" class="tab-panel"></div>
+        <div id="tab-credit" class="tab-panel"></div>
+        <div id="tab-cancelled" class="tab-panel"></div>
+        <div id="tab-rejected" class="tab-panel"></div>
+        <div id="tab-requests" class="tab-panel"></div>
+        <div id="tab-users" class="tab-panel"></div>
+      </div>
+    </main>
+
+    <!-- ===================== صفحة ملف العميل ===================== -->
+    <main id="client-view" class="view hidden">
+      <div class="container">
+        <button id="client-back" class="btn btn-outline btn-back">↩ العودة إلى قائمة العملاء</button>
+        <div id="client-content"></div>
+      </div>
+    </main>
+
+    <!-- ===================== صفحة فرعية للعميل (فواتير/دفعات/كشف/تحليلات) ===================== -->
+    <main id="subpage-view" class="view hidden">
+      <div class="container">
+        <button id="subpage-back" class="btn btn-outline btn-back">↩ العودة إلى ملف العميل</button>
+        <div id="subpage-content"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===================== نافذة منبثقة عامة (نماذج) ===================== -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button type="button" class="modal-close" onclick="closeModal()" aria-label="إغلاق">&times;</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ===================== نافذة التأكيد ===================== -->
+  <div id="confirm-overlay" class="modal-overlay confirm-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="confirm-title"></h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-message" class="info-line" style="margin-bottom:0"></p>
+        <div class="modal-actions">
+          <button id="confirm-yes" class="btn btn-success">تأكيد</button>
+          <button id="confirm-cancel" class="btn btn-outline">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- تنبيه صغير -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/config.js?v=demo1"></script>
+  <script src="js/demo-data.js?v=demo1"></script>
+  <script src="js/data.js?v=demo1"></script>
+  <script src="js/store.js?v=demo1"></script>
+  <script src="js/app.js?v=demo1"></script>
+  <script src="js/demo.js?v=demo1"></script>
+</body>
+</html>
