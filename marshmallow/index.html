@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="نسخة تجريبية لنظام Marshmallow — إدارة رئيسية ومخزن ومحاسبة وخمسة عشر فرعاً. بيانات وهمية بالكامل.">
+  <meta name="description" content="نسخة تجريبية لنظام Marshmallow — إدارة رئيسية ومخزن ومحاسبة وتقارير وخمسة عشر فرعاً. بيانات وهمية بالكامل.">
   <meta name="robots" content="noindex">
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%23141416%27%2F%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%276%27%20fill%3D%27%23fff%27%2F%3E%3C%2Fsvg%3E">
   <style>
@@ -203,6 +203,25 @@
     color:var(--ink); min-width:180px; }
   .backlink { border:none; background:none; color:var(--ink); font-weight:700; padding:0; font-size:14px; text-decoration:underline; text-underline-offset:3px; }
 
+  /* صور الأصناف */
+  .thumb { width:44px; height:52px; border-radius:7px; object-fit:cover; display:block;
+    border:1px solid var(--line); background:var(--surface-2); }
+  .thumb-ph { width:44px; height:52px; border-radius:7px; border:1px dashed var(--line-2);
+    background:var(--surface-2); display:flex; align-items:center; justify-content:center;
+    color:var(--ink-3); font-size:15px; }
+  .thumb-lg { width:120px; height:144px; }
+  .pthumb { width:100%; aspect-ratio:3/4; border-radius:8px; object-fit:cover; display:block;
+    border:1px solid var(--line); background:var(--surface-2); margin-bottom:4px; }
+  .pthumb-ph { width:100%; aspect-ratio:3/4; border-radius:8px; border:1px dashed var(--line-2);
+    background:var(--surface-2); display:flex; align-items:center; justify-content:center;
+    color:var(--ink-3); font-size:22px; margin-bottom:4px; }
+  .drop { border:1px dashed var(--line-2); border-radius:10px; padding:14px; display:flex;
+    gap:14px; align-items:center; background:var(--surface-2); }
+  .drop input[type=file] { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+  label.filebtn { display:inline-block; border:1px solid var(--line-2); background:var(--surface);
+    color:var(--ink); padding:7px 14px; border-radius:9px; font-weight:500; font-size:13.5px; cursor:pointer; }
+  label.filebtn:hover { background:var(--surface-3); }
+
   /* الفلاتر */
   .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; background:var(--surface);
     border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
@@ -304,7 +323,7 @@ const STYLES = [
   return { code:'MRS-'+(++styleSeq), name:s[0], price:s[1], cat:s[2],
            cost:r5(s[1]*(0.38+R()*0.12)), colors:cols, sizes:SIZES.slice(),
            season:pick(SEASONS), reorder:ri(40,70), supplier:pick(SUPPLIERS),
-           depth:0.5+R()*0.85 };
+           depth:0.5+R()*0.85, img:null };
 });
 const styleBy = c => STYLES.find(s=>s.code===c);
 const vkey = (sz,cl)=> sz+'|'+cl;
@@ -427,11 +446,13 @@ function je(date, desc, lines, src){
   JOURNAL.push({ id:'JV-'+String(++jSeq).padStart(4,'0'), date, desc, src: src||'تلقائي',
                  lines: lines.map(l=>({acc:l.acc, dr:Math.round(l.dr||0), cr:Math.round(l.cr||0)})) });
 }
+let OPEN_INV = 0;
+const OPEN_AP = 2380000;   // رصيد الموردين أول المدة
 (function buildBooks(){
-  const openInv = BRANCHES.reduce((a,b)=>a+stockValue(b.id),0);
+  OPEN_INV = BRANCHES.reduce((a,b)=>a+stockValue(b.id),0);
   je(dayKey(DAYS-1), 'أرصدة افتتاحية', [
-    {acc:'1110',dr:780000}, {acc:'1120',dr:2150000}, {acc:'1140',dr:openInv},
-    {acc:'1210',dr:4200000}, {acc:'1220',cr:880000}, {acc:'2110',cr:2380000}
+    {acc:'1110',dr:780000}, {acc:'1120',dr:2150000}, {acc:'1140',dr:OPEN_INV},
+    {acc:'1210',dr:4200000}, {acc:'1220',cr:880000}, {acc:'2110',cr:OPEN_AP}
   ], 'افتتاحي');
 
   for (let mo=2; mo>=0; mo--){
@@ -449,6 +470,12 @@ function je(date, desc, lines, src){
     je(dt, 'مردودات مبيعات — '+label, [{acc:'4120',dr:rets},{acc:'1110',cr:rets}]);
     const purch = Math.round(cogs*1.15);
     je(dt, 'مشتريات بضاعة من الموردين — '+label, [{acc:'1140',dr:purch},{acc:'2110',cr:purch}]);
+    /* مبيعات جملة بالآجل لعملاء الشركات — مصدر رصيد الذمم المدينة */
+    const cred = Math.round(gross*0.08), credNet = Math.round(cred*100/114);
+    je(dt, 'مبيعات جملة آجلة — '+label,
+      [{acc:'1130',dr:cred},{acc:'4110',cr:credNet},{acc:'2120',cr:cred-credNet}]);
+    je(dt, 'تحصيل من عملاء الجملة — '+label,
+      [{acc:'1110',dr:Math.round(cred*0.68)},{acc:'1130',cr:Math.round(cred*0.68)}]);
     [['5210','إيجارات الفروع',1250000,'1120'],['5220','رواتب وأجور',1450000,'1110'],
      ['5230','كهرباء ومياه',240000,'1120'],['5240','تسويق وإعلان',310000,'1120'],
      ['5250','نقل وشحن',120000,'1110'],['5260','مصروفات متنوعة',85000,'1110']]
@@ -459,6 +486,27 @@ function je(date, desc, lines, src){
     je(dt, 'توريد ضريبة القيمة المضافة — '+label, [{acc:'2120',dr:Math.round(vat*0.9)},{acc:'1120',cr:Math.round(vat*0.9)}]);
   }
 })();
+
+/* ---------- أرصدة أول المدة والعملاء ---------- */
+const R2 = mulberry32(31337);
+const SUP_SHARE = [0.28,0.23,0.20,0.16,0.13];
+const OPEN_SUP = SUPPLIERS.map((n,i)=>({ name:n,
+  open: i===SUPPLIERS.length-1
+    ? OPEN_AP - SUP_SHARE.slice(0,-1).reduce((a,x)=>a+Math.round(OPEN_AP*x),0)
+    : Math.round(OPEN_AP*SUP_SHARE[i]) }));
+const OPEN_BR = (()=>{
+  const cur = BRANCHES.map(b=>stockValue(b.id)), tot = cur.reduce((a,c)=>a+c,0);
+  let acc = 0;
+  return BRANCHES.map((b,i)=>{
+    const stock = i===BRANCHES.length-1 ? OPEN_INV-acc : Math.round(OPEN_INV*cur[i]/tot);
+    acc += stock;
+    return { id:b.id, name:b.name, stock, account: Math.round((150000+R2()*750000)/500)*500 };
+  });
+})();
+const CUSTOMERS = [
+  'مجموعة سيتي ستارز للتجزئة','بوتيك لافاند — الإسكندرية','شركة رُوّاد الأزياء',
+  'معرض الماسة للملابس','سلسلة زهرة الشرق','مؤسسة النخبة التجارية'
+].map((n,i)=>({ name:n, share:[0.26,0.21,0.17,0.15,0.12,0.09][i], days:[12,28,45,7,62,21][i] }));
 
 const jLines = () => JOURNAL.flatMap(j=>j.lines.map(l=>({...l, j})));
 function accBal(code){
@@ -498,11 +546,14 @@ function balanceSheet(){
    الحالة
    ============================================================ */
 const MODES       = ['admin','wh','acc','branch'];
-const ADMIN_TABS  = [['dash','لوحة التحكم'],['branches','الفروع'],['wh','المخزن'],['acc','الحسابات']];
+const ADMIN_TABS  = [['dash','لوحة التحكم'],['branches','الفروع'],['wh','المخزن'],['acc','الحسابات'],['rep','التقارير']];
+const REP_VIEWS   = [['ship','البضاعة المرسلة'],['sr','المبيعات والمرتجعات'],
+                     ['stmt','كشف حساب الفرع'],['find','تتبّع صنف']];
 const BRANCH_TABS = [['sell','البيع'],['bstock','المخزون'],['rets','المرتجعات'],['log','سجل الشهر']];
 const WH_VIEWS    = [['items','الأصناف'],['grn','التوريد'],['trf','التحويلات'],['adj','الجرد']];
 let S = { mode:'admin', tab:'dash', branch:1, profile:null, cart:[], q:'', sq:'',
-          bview:'list', whview:'items', accview:'over', ledger:null,
+          bview:'list', whview:'items', accview:'over', repview:'ship', ledger:null,
+  RF:{ from:iso(dayKey(6)), to:iso(dayKey(0)), branch:'all' }, findCode:null, findQ:'',
           F:{ from:iso(dayKey(29)), to:iso(dayKey(0)), branch:'all', types:{sale:1,return:1,receipt:1,transfer:1,count:1}, q:'' },
           NI:null, JE:null, WF:null };
 const $ = s => document.querySelector(s);
@@ -542,7 +593,11 @@ const accSubnav = () => `<div class="subnav" role="group">${ACC_VIEWS.map(([k,l]
   `<button data-av="${k}" aria-pressed="${S.accview===k&&!S.ledger}">${l}</button>`).join('')}</div>`;
 function whBody(){ return ({items:whItems, grn:whGRN, trf:whTRF, adj:whADJ})[S.whview](); }
 function accBody(){ if(S.ledger) return ledgerPanel(S.ledger);
-  return ({over:accOver, coa:accCOA, je:accJE, tb:accTB, is:accIS, bs:accBS, ap:accAP})[S.accview](); }
+  return ({over:accOver, open:accOpen, dx:accDX, dues:accDues, coa:accCOA, je:accJE,
+           tb:accTB, is:accIS, bs:accBS})[S.accview](); }
+const repSubnav = () => `<div class="subnav" role="group">${REP_VIEWS.map(([k,l])=>
+  `<button data-rv="${k}" aria-pressed="${S.repview===k}">${l}</button>`).join('')}</div>`;
+function repBody(){ return ({ship:repShip, sr:repSR, stmt:repStmt, find:repFind})[S.repview](); }
 function render(){
   renderTabs();
   const v=$('#view');
@@ -550,6 +605,7 @@ function render(){
     if (S.profile)          v.innerHTML = viewProfile(S.profile);
     else if (S.tab==='wh')  v.innerHTML = roBanner('المخزن')   + whSubnav()  + whBody();
     else if (S.tab==='acc') v.innerHTML = roBanner('الحسابات') + accSubnav() + accBody();
+    else if (S.tab==='rep') v.innerHTML = repSubnav() + repBody();
     else                    v.innerHTML = ({dash:viewDash, branches:viewBranches})[S.tab]();
   }
   else if (S.mode==='branch') v.innerHTML = ({sell:viewSell,bstock:viewBStock,rets:viewRets,log:viewLog})[S.tab]();
@@ -746,10 +802,11 @@ function whItems(){
     <input class="srch" id="sq" placeholder="ابحث بالاسم أو الكود أو التصنيف..." value="${esc(S.q)}" style="flex:1; max-width:340px">
     <span class="sub">${AR(list.length)} صنف</span></div>
   <div class="tscroll"><table>
-    <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>الموسم</th><th>الألوان</th><th>المقاسات</th><th>التكلفة</th><th>البيع</th><th>الهامش</th><th>المخزن الرئيسي</th><th>بالفروع</th><th>حد الطلب</th><th>الحالة</th></tr></thead>
+    <thead><tr><th></th><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>الموسم</th><th>الألوان</th><th>المقاسات</th><th>التكلفة</th><th>البيع</th><th>الهامش</th><th>المخزن الرئيسي</th><th>بالفروع</th><th>حد الطلب</th><th>الحالة</th></tr></thead>
     <tbody>${list.map(s=>{ const q2=totalQty(s.code), lim=s.reorder*15;
       const st = q2===0?['b-loud','نفد'] : q2<=lim?['b-mark','تحت الحد'] : ['b-quiet','متاح'];
       return `<tr class="clickable" data-s="${s.code}">
+        <td style="padding:6px 13px">${thumb(s)}</td>
         <td class="code">${s.code}</td><td style="font-weight:700">${esc(s.name)}</td>
         <td class="sub">${esc(s.cat)}</td><td class="sub">${esc(s.season)}</td>
         <td class="sub">${AR(s.colors.length)}</td><td class="sub">${AR(s.sizes.length)}</td>
@@ -920,7 +977,7 @@ function wireWF(){
 /* نموذج صنف جديد — يولّد المتغيّرات والأكواد والباركود مباشرةً */
 function newItemForm(){
   S.NI = S.NI || { name:'', cat:CATS[0], season:SEASONS[0], cost:'', price:'', reorder:50,
-                   supplier:SUPPLIERS[0], colors:['أسود'], sizes:['S','M','L'] };
+                   supplier:SUPPLIERS[0], colors:['أسود'], sizes:['S','M','L'], img:null };
   const N=S.NI;
   const nVar = N.colors.length*N.sizes.length;
   const margin = (N.cost>0 && N.price>0) ? Math.round((N.price-N.cost)/N.price*100) : null;
@@ -939,6 +996,22 @@ function newItemForm(){
         <select id="n-season">${SEASONS.map(c=>`<option ${c===N.season?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
       <div class="f-full"><label for="n-sup">المورّد</label>
         <select id="n-sup">${SUPPLIERS.map(c=>`<option ${c===N.supplier?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    </div>
+  </div>
+  <div class="fieldset">
+    <h4>صورة الصنف</h4>
+    <div class="drop">
+      ${ N.img ? `<img class="thumb thumb-lg" src="${N.img}" alt="معاينة">`
+               : `<div class="thumb-ph thumb-lg">${GARMENT}</div>` }
+      <div class="stack-s" style="flex:1; min-width:0">
+        <div class="row" style="gap:8px">
+          <label class="filebtn" for="n-img">${ N.img ? 'تغيير الصورة' : 'اختيار صورة…' }</label>
+          <input type="file" id="n-img" accept="image/*">
+          ${ N.img ? '<button class="btn btn-sm" id="n-img-x">إزالة</button>' : '' }
+          ${ N.imgName ? `<span class="sub" style="min-width:0; overflow:hidden; text-overflow:ellipsis">${esc(N.imgName)}</span>` : '' }
+        </div>
+        <p class="hint">صورة واحدة للصنف تظهر في جدول المخزن وفي شاشة البيع بالفرع. تُصغَّر تلقائياً قبل الحفظ.</p>
+      </div>
     </div>
   </div>
   <div class="fieldset">
@@ -997,13 +1070,18 @@ function wireNewItem(){
     N.sizes.sort((a,b)=>['S','M','L','XL','XXL'].indexOf(a)-['S','M','L','XL','XXL'].indexOf(b)); re(); });
   document.querySelectorAll('[data-ncl]').forEach(b=> b.onclick=()=>{ const c=b.dataset.ncl;
     N.colors.includes(c) ? N.colors.splice(N.colors.indexOf(c),1) : N.colors.push(c); re(); });
+  const fi=$('#n-img'); if(fi) fi.onchange=e=>{ const f=e.target.files && e.target.files[0];
+    readImage(f, d=>{ N.img=d; N.imgName = d && f ? f.name : null; re();
+      if(!d && f) toast('تعذّر قراءة الصورة — جرّب صورة أخرى'); }); };
+  const fx=$('#n-img-x'); if(fx) fx.onclick=()=>{ N.img=null; N.imgName=null; re(); };
   const cancel=$('#n-cancel'); if(cancel) cancel.onclick=()=>{ S.NI=null; $('#layer').innerHTML=''; };
   const save=$('#n-save'); if(save) save.onclick=()=>{
     const s = { code:'MRS-'+(++styleSeq), name:N.name.trim(), price:+N.price, cat:N.cat, cost:+N.cost,
       colors:N.colors.slice(), sizes:N.sizes.slice(), season:N.season, reorder:+N.reorder||50,
-      supplier:N.supplier, depth:1 };
+      supplier:N.supplier, depth:1, img:N.img };
     STYLES.push(s);
-    BRANCHES.forEach(b=>{ const m={}; s.colors.forEach(cl=> s.sizes.forEach(sz=>{ m[vkey(sz,cl)]=0; }));
+    [{id:WH_ID}, ...BRANCHES].forEach(b=>{ const m={};
+      s.colors.forEach(cl=> s.sizes.forEach(sz=>{ m[vkey(sz,cl)]=0; }));
       STOCK[b.id][s.code]=m; });
     const n = s.colors.length*s.sizes.length;
     S.NI=null; $('#layer').innerHTML=''; render();
@@ -1014,8 +1092,9 @@ function wireNewItem(){
 /* ============================================================
    شاشة المحاسب
    ============================================================ */
-const ACC_VIEWS = [['over','نظرة عامة'],['coa','دليل الحسابات'],['je','قيود اليومية'],
-                   ['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية العمومية'],['ap','الموردون']];
+const ACC_VIEWS = [['over','نظرة عامة'],['open','أول المدة'],['dx','الإيرادات والمصروفات'],
+                   ['dues','الذمم والمستحقات'],['coa','دليل الحسابات'],['je','قيود اليومية'],
+                   ['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية العمومية']];
 function accOver(){
   const P=pnl(), B=balanceSheet();
   return `
@@ -1192,18 +1271,316 @@ function accBS(){
     </tbody></table></div></div>
   </div>`;
 }
-function accAP(){
-  const total=Math.abs(accBal('2110').bal);
-  const rows=SUPPLIERS.map((s,i)=>{ const share=[0.31,0.24,0.19,0.15,0.11][i];
-    return { name:s, bal:Math.round(total*share), items:STYLES.filter(x=>x.supplier===s).length,
-             due: dayKey(-(10+i*7)) }; });
-  return `<div class="sechead"><h2>الموردون</h2><span class="sub">رصيد حساب الموردين ${EGP(total)}</span></div>
-  <div class="tscroll"><table><thead><tr><th>المورّد</th><th>عدد الأصناف</th><th>الرصيد المستحق</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr></thead>
-    <tbody>${rows.map(r=>`<tr><td style="font-weight:700">${esc(r.name)}</td><td class="n">${AR(r.items)}</td>
-      <td class="n">${EGP(r.bal)}</td><td class="sub">${dmy(r.due)}</td>
-      <td><span class="badge ${r.due<new Date()?'b-loud':'b-quiet'}">${r.due<new Date()?'متأخر':'قادم'}</span></td></tr>`).join('')}
-      <tr class="totalrow"><td>الإجمالي</td><td></td><td class="n">${EGP(rows.reduce((a,r)=>a+r.bal,0))}</td><td></td><td></td></tr>
+function accOpen(){
+  const totS = OPEN_BR.reduce((a,x)=>a+x.stock,0), totA = OPEN_BR.reduce((a,x)=>a+x.account,0);
+  const totP = OPEN_SUP.reduce((a,x)=>a+x.open,0);
+  return `<div class="sechead"><div><h2>أرصدة أول المدة</h2>
+    <span class="sub">كما في ${dmy(dayKey(DAYS-1))} — نقطة بداية الدفاتر</span></div></div>
+  <div class="notice"><span>📌</span><div>هذه الأرصدة هي ما بدأ منه النظام. مجموع مخزون الفروع هنا يطابق قيد <b>الأرصدة الافتتاحية</b> في دفتر اليومية، ومجموع أرصدة الموردين يطابق رصيد حساب <b>الموردون</b> أول المدة.</div></div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">مخزون الفروع أول المدة</span><span class="val">${EGP(totS)}</span><span class="meta">بالتكلفة</span></div>
+    <div class="tile"><span class="lbl">أرصدة الفروع أول المدة</span><span class="val">${EGP(totA)}</span><span class="meta">حساب جارٍ مدين</span></div>
+    <div class="tile"><span class="lbl">أرصدة الموردين أول المدة</span><span class="val">${EGP(totP)}</span><span class="meta">مستحق عليهم لنا؟ لا — علينا لهم</span></div>
+  </div>
+  <div class="row" style="align-items:flex-start; gap:18px">
+    <div style="flex:1 1 380px; min-width:0"><div class="tscroll"><table>
+      <thead><tr><th>الفرع</th><th>مخزون أول المدة</th><th>رصيد الحساب الجاري</th></tr></thead>
+      <tbody>${OPEN_BR.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${EGP(x.stock)}</td>
+        <td class="n">${EGP(x.account)}</td></tr>`).join('')}
+        <tr class="totalrow"><td>الإجمالي</td><td class="n">${EGP(totS)}</td><td class="n">${EGP(totA)}</td></tr>
+      </tbody></table></div></div>
+    <div style="flex:1 1 320px; min-width:0"><div class="tscroll"><table>
+      <thead><tr><th>المورّد</th><th>رصيد أول المدة</th></tr></thead>
+      <tbody>${OPEN_SUP.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${EGP(x.open)}</td></tr>`).join('')}
+        <tr class="totalrow"><td>الإجمالي</td><td class="n">${EGP(totP)}</td></tr>
+      </tbody></table></div></div>
+  </div>`;
+}
+
+function accDX(){
+  const all = dailyAll().slice(-30);
+  const P = pnl();
+  const months = 3;
+  const dailyOpex = Math.round(P.opex/(30*months));          // المصروفات الثابتة موزّعة يومياً
+  const rows = all.map(d=>{
+    const vat = Math.round(d.total*14/114), net = d.total-vat;
+    const cogs = Math.round(net*0.43);
+    return { d:d.d, gross:d.total, vat, net, cogs, opex:dailyOpex, profit: net-cogs-dailyOpex };
+  }).reverse();
+  const T = rows.reduce((a,r)=>({ gross:a.gross+r.gross, net:a.net+r.net, cogs:a.cogs+r.cogs,
+    opex:a.opex+r.opex, profit:a.profit+r.profit }), {gross:0,net:0,cogs:0,opex:0,profit:0});
+  const best = rows.reduce((a,r)=>r.profit>a.profit?r:a, rows[0]);
+  return `<div class="sechead"><div><h2>الإيرادات والمصروفات اليومية</h2>
+    <span class="sub">آخر ٣٠ يوماً · كل الفروع</span></div></div>
+  <div class="notice"><span>🧮</span><div>الإيرادات وتكلفة البضاعة محسوبة من مبيعات كل يوم فعلياً. المصروفات الثابتة (إيجارات ورواتب ومرافق) <b>موزّعة بالتساوي على أيام الشهر</b> لأنها تُسجَّل شهرياً في الدفاتر — وهذا هو العرض الإداري المعتاد.</div></div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">صافي الإيراد</span><span class="val">${EGP(T.net)}</span><span class="meta">بعد الضريبة</span></div>
+    <div class="tile"><span class="lbl">تكلفة البضاعة</span><span class="val">${EGP(T.cogs)}</span><span class="meta">٣٠ يوم</span></div>
+    <div class="tile"><span class="lbl">المصروفات</span><span class="val">${EGP(T.opex)}</span><span class="meta">موزّعة يومياً</span></div>
+    <div class="tile"><span class="lbl">الربح التشغيلي</span><span class="val">${EGP(T.profit)}</span><span class="meta">هامش ${AR(Math.round(T.profit/T.net*100))}٪</span></div>
+    <div class="tile"><span class="lbl">أفضل يوم</span><span class="val">${dm(best.d)}</span><span class="meta">${EGP(best.profit)} ربح</span></div>
+  </div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>التاريخ</th><th>المبيعات بالضريبة</th><th>ض.ق.م</th><th>صافي الإيراد</th><th>تكلفة البضاعة</th><th>المصروفات</th><th>الربح</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td class="sub">${dmy(r.d)}</td><td class="n">${EGP(r.gross)}</td>
+      <td class="n sub">${EGP(r.vat)}</td><td class="n">${EGP(r.net)}</td><td class="n sub">${EGP(r.cogs)}</td>
+      <td class="n sub">${EGP(r.opex)}</td>
+      <td class="n" style="font-weight:700">${r.profit<0?'('+EGP(Math.abs(r.profit))+')':EGP(r.profit)}</td></tr>`).join('')}
+      <tr class="totalrow"><td>الإجمالي</td><td class="n">${EGP(T.gross)}</td><td class="n"></td>
+        <td class="n">${EGP(T.net)}</td><td class="n">${EGP(T.cogs)}</td><td class="n">${EGP(T.opex)}</td>
+        <td class="n">${EGP(T.profit)}</td></tr>
     </tbody></table></div>`;
+}
+
+function accDues(){
+  const ap = Math.abs(accBal('2110').bal), ar = accBal('1130').bal;
+  const sup = OPEN_SUP.map((x,i)=>({ name:x.name, bal:Math.round(ap*SUP_SHARE[i]),
+    items: STYLES.filter(y=>y.supplier===x.name).length, due: dayKey(-(8+i*9)) }));
+  const cus = CUSTOMERS.map(c=>({ ...c, bal:Math.round(ar*c.share), due: dayKey(30-c.days) }));
+  const overdue = cus.filter(c=>c.days>30).reduce((a,c)=>a+c.bal,0);
+  return `<div class="sechead"><div><h2>الذمم والمستحقات</h2>
+    <span class="sub">أرصدة مُشتقّة من حسابَي الموردين والعملاء في الدفاتر</span></div></div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">مستحق للموردين</span><span class="val">${EGP(ap)}</span><span class="meta">${AR(sup.length)} مورّد</span></div>
+    <div class="tile"><span class="lbl">مستحق على العملاء</span><span class="val">${EGP(ar)}</span><span class="meta">${AR(cus.length)} عميل جملة</span></div>
+    <div class="tile"><span class="lbl">متأخر عن ٣٠ يوماً</span><span class="val">${EGP(overdue)}</span><span class="meta">يحتاج متابعة</span></div>
+    <div class="tile"><span class="lbl">صافي المركز</span><span class="val">${EGP(Math.abs(ar-ap))}</span><span class="meta">${ar-ap<0?'علينا':'لنا'}</span></div>
+  </div>
+  <div class="sechead"><h2 style="font-size:16px">ديون الموردين — علينا</h2></div>
+  <div class="tscroll"><table><thead><tr><th>المورّد</th><th>عدد الأصناف</th><th>رصيد أول المدة</th><th>الرصيد الحالي</th><th>الاستحقاق</th><th>الحالة</th></tr></thead>
+    <tbody>${sup.map((r,i)=>`<tr><td style="font-weight:700">${esc(r.name)}</td><td class="n">${AR(r.items)}</td>
+      <td class="n sub">${EGP(OPEN_SUP[i].open)}</td><td class="n">${EGP(r.bal)}</td>
+      <td class="sub">${dmy(r.due)}</td>
+      <td><span class="badge ${r.due<new Date()?'b-loud':'b-quiet'}">${r.due<new Date()?'متأخر':'قادم'}</span></td></tr>`).join('')}
+      <tr class="totalrow"><td>الإجمالي</td><td></td><td class="n">${EGP(OPEN_SUP.reduce((a,x)=>a+x.open,0))}</td>
+        <td class="n">${EGP(sup.reduce((a,r)=>a+r.bal,0))}</td><td></td><td></td></tr>
+    </tbody></table></div>
+  <div class="sechead"><h2 style="font-size:16px">ديون العملاء — لنا</h2></div>
+  <div class="tscroll"><table><thead><tr><th>العميل</th><th>الرصيد المستحق</th><th>عمر الدين</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr></thead>
+    <tbody>${cus.map(r=>`<tr><td style="font-weight:700">${esc(r.name)}</td><td class="n">${EGP(r.bal)}</td>
+      <td class="n sub">${AR(r.days)} يوم</td><td class="sub">${dmy(r.due)}</td>
+      <td><span class="badge ${r.days>60?'b-loud':r.days>30?'b-mark':'b-quiet'}">${r.days>60?'متعثّر':r.days>30?'متأخر':'منتظم'}</span></td></tr>`).join('')}
+      <tr class="totalrow"><td>الإجمالي</td><td class="n">${EGP(cus.reduce((a,r)=>a+r.bal,0))}</td><td></td><td></td><td></td></tr>
+    </tbody></table></div>`;
+}
+
+/* ============================================================
+   التقارير والرقابة
+   ============================================================ */
+function rfBar(withBranch){
+  const F=S.RF;
+  return `<div class="filters">
+    <div class="f"><label for="r-from">من تاريخ</label><input class="fld" type="date" id="r-from" value="${F.from}"></div>
+    <div class="f"><label for="r-to">إلى تاريخ</label><input class="fld" type="date" id="r-to" value="${F.to}"></div>
+    ${ withBranch ? `<div class="f"><label for="r-branch">الفرع</label>
+      <select class="fld" id="r-branch"><option value="all">كل الفروع</option>
+      ${BRANCHES.map(b=>`<option value="${b.id}" ${F.branch==String(b.id)?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`:'' }
+    <div class="f"><label>&nbsp;</label><button class="btn btn-sm" id="r-reset">آخر ٧ أيام</button></div>
+  </div>`;
+}
+function rfRange(){ return [new Date(S.RF.from+'T00:00:00'), new Date(S.RF.to+'T23:59:59')]; }
+function rfMoves(kinds){
+  const [f,t]=rfRange();
+  return MOVES.filter(m=> m.at>=f && m.at<=t && kinds.includes(m.kind) &&
+    (S.RF.branch==='all' || m.bid===+S.RF.branch || m.to===+S.RF.branch));
+}
+
+/* ١ — تقرير يومي بالبضاعة المرسلة لكل فرع */
+function repShip(){
+  const [f,t]=rfRange();
+  const inbound = MOVES.filter(m=> m.at>=f && m.at<=t &&
+    ((m.kind==='transfer' && m.to!=null && m.to!==WH_ID) || (m.kind==='receipt' && m.bid!==WH_ID)))
+    .filter(m=> S.RF.branch==='all' || (m.kind==='transfer'? m.to===+S.RF.branch : m.bid===+S.RF.branch));
+  const dest = m => m.kind==='transfer' ? m.to : m.bid;
+  const byBranch = new Map();
+  inbound.forEach(m=>{ const k=dest(m); const o=byBranch.get(k)||{qty:0,val:0,n:0};
+    o.qty+=m.qty; o.val+=m.value; o.n++; byBranch.set(k,o); });
+  const byDay = new Map();
+  inbound.forEach(m=>{ const k=iso(m.at); const o=byDay.get(k)||{qty:0,val:0,n:0};
+    o.qty+=m.qty; o.val+=m.value; o.n++; byDay.set(k,o); });
+  const days=[...byDay.entries()].sort((a,b)=>b[0].localeCompare(a[0]));
+  const tq=inbound.reduce((a,m)=>a+m.qty,0), tv=inbound.reduce((a,m)=>a+m.value,0);
+  return `<div class="sechead"><div><h2>البضاعة المرسلة للفروع</h2>
+    <span class="sub">تحويلات من المخزن الرئيسي وتوريدات مباشرة من الموردين</span></div></div>
+  ${rfBar(true)}
+  <div class="tiles">
+    <div class="tile"><span class="lbl">عدد الإرساليات</span><span class="val">${AR(inbound.length)}</span><span class="meta">في الفترة</span></div>
+    <div class="tile"><span class="lbl">إجمالي القطع</span><span class="val">${AR(tq)}</span><span class="meta">—</span></div>
+    <div class="tile"><span class="lbl">القيمة بالتكلفة</span><span class="val">${EGP(tv)}</span><span class="meta">—</span></div>
+    <div class="tile"><span class="lbl">فروع مستقبِلة</span><span class="val">${AR(byBranch.size)}</span><span class="meta">من ${AR(15)}</span></div>
+  </div>
+  <div class="row" style="align-items:flex-start; gap:18px">
+    <div style="flex:1 1 340px; min-width:0">
+      <div class="sechead"><h2 style="font-size:16px">حسب الفرع</h2></div>
+      <div class="tscroll"><table><thead><tr><th>الفرع</th><th>إرساليات</th><th>قطع</th><th>القيمة</th></tr></thead>
+        <tbody>${ byBranch.size ? [...byBranch.entries()].sort((a,b)=>b[1].val-a[1].val).map(([k,o])=>
+          `<tr><td>${esc(locName(k))}</td><td class="n">${AR(o.n)}</td><td class="n">${AR(o.qty)}</td>
+           <td class="n">${EGP(o.val)}</td></tr>`).join('')
+          : '<tr><td colspan="4" class="empty">لا توجد إرساليات في الفترة.</td></tr>' }
+        </tbody></table></div></div>
+    <div style="flex:1 1 300px; min-width:0">
+      <div class="sechead"><h2 style="font-size:16px">حسب اليوم</h2></div>
+      <div class="tscroll"><table><thead><tr><th>اليوم</th><th>إرساليات</th><th>قطع</th><th>القيمة</th></tr></thead>
+        <tbody>${ days.length ? days.map(([k,o])=>`<tr><td class="sub">${dmy(new Date(k+'T12:00:00'))}</td>
+          <td class="n">${AR(o.n)}</td><td class="n">${AR(o.qty)}</td><td class="n">${EGP(o.val)}</td></tr>`).join('')
+          : '<tr><td colspan="4" class="empty">لا توجد إرساليات.</td></tr>' }
+        </tbody></table></div></div>
+  </div>
+  <div class="sechead"><h2 style="font-size:16px">تفاصيل الإرساليات</h2><span class="sub">${AR(Math.min(inbound.length,120))} من ${AR(inbound.length)}</span></div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>المستند</th><th>التاريخ</th><th>المصدر</th><th>الفرع المستقبِل</th><th>الصنف</th><th>المقاس واللون</th><th>العدد</th><th>القيمة</th></tr></thead>
+    <tbody>${ inbound.length ? inbound.slice(0,120).map(m=>`<tr><td class="code">${m.id}</td>
+      <td class="sub">${dmy(m.at)}</td>
+      <td>${ m.kind==='transfer' ? esc(locName(m.from!=null?m.from:WH_ID)) : esc(m.supplier||'مورّد') }</td>
+      <td style="font-weight:700">${esc(locName(dest(m)))}</td><td>${esc(m.name)}</td>
+      <td class="sub">${m.size} · ${esc(m.color)}</td><td class="n">${AR(m.qty)}</td>
+      <td class="n">${EGP(m.value)}</td></tr>`).join('')
+      : '<tr><td colspan="8" class="empty">لا توجد إرساليات في الفترة المحددة.</td></tr>' }
+    </tbody></table></div>`;
+}
+
+/* ٢ — تقرير المبيعات والمرتجعات */
+function repSR(){
+  const [f,t]=rfRange();
+  const inR = m => m.at>=f && m.at<=t && (S.RF.branch==='all' || m.bid===+S.RF.branch);
+  const rows = BRANCHES.filter(b=> S.RF.branch==='all' || b.id===+S.RF.branch).map(b=>{
+    const sa = MOVES.filter(m=>m.kind==='sale' && m.bid===b.id && inR(m));
+    const re = MOVES.filter(m=>m.kind==='return' && m.bid===b.id && inR(m));
+    const sv = sa.reduce((a,m)=>a+m.value,0), rv = re.reduce((a,m)=>a+m.value,0);
+    return { b, sn:sa.length, sv, rn:re.length, rv, net:sv-rv, rate: sv? rv/sv*100 : 0 };
+  }).sort((a,b)=>b.sv-a.sv);
+  const T = rows.reduce((a,r)=>({sn:a.sn+r.sn,sv:a.sv+r.sv,rn:a.rn+r.rn,rv:a.rv+r.rv,net:a.net+r.net}),
+                        {sn:0,sv:0,rn:0,rv:0,net:0});
+  const worst = rows.slice().sort((a,b)=>b.rate-a.rate)[0];
+  const maxSv = Math.max(...rows.map(r=>r.sv), 1);
+  return `<div class="sechead"><div><h2>المبيعات والمرتجعات</h2>
+    <span class="sub">لكل فرع خلال الفترة المحددة</span></div></div>
+  ${rfBar(true)}
+  <div class="tiles">
+    <div class="tile"><span class="lbl">إجمالي المبيعات</span><span class="val">${EGP(T.sv)}</span><span class="meta">${AR(T.sn)} فاتورة</span></div>
+    <div class="tile"><span class="lbl">إجمالي المرتجعات</span><span class="val">${EGP(T.rv)}</span><span class="meta">${AR(T.rn)} مرتجع</span></div>
+    <div class="tile"><span class="lbl">صافي المبيعات</span><span class="val">${EGP(T.net)}</span><span class="meta">—</span></div>
+    <div class="tile"><span class="lbl">نسبة المرتجع</span><span class="val">${AR(Math.round(T.sv?T.rv/T.sv*100:0))}٪</span><span class="meta">من المبيعات</span></div>
+    <div class="tile"><span class="lbl">أعلى نسبة مرتجع</span><span class="val">${worst?esc(worst.b.name):'—'}</span><span class="meta">${worst?AR(Math.round(worst.rate))+'٪':''}</span></div>
+  </div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>الفرع</th><th>فواتير</th><th>المبيعات</th><th></th><th>مرتجعات</th><th>قيمة المرتجع</th><th>نسبة المرتجع</th><th>الصافي</th></tr></thead>
+    <tbody>${ rows.length ? rows.map(r=>`<tr>
+      <td style="font-weight:700">${esc(r.b.name)}</td><td class="n">${AR(r.sn)}</td>
+      <td class="n">${EGP(r.sv)}</td>
+      <td style="width:110px"><div class="minibar"><i style="width:${(r.sv/maxSv*100).toFixed(1)}%"></i></div></td>
+      <td class="n">${AR(r.rn)}</td><td class="n">${EGP(r.rv)}</td>
+      <td class="n"><span class="badge ${r.rate>6?'b-loud':r.rate>3?'b-mark':'b-quiet'}">${AR(Math.round(r.rate))}٪</span></td>
+      <td class="n" style="font-weight:700">${EGP(r.net)}</td></tr>`).join('')
+      : '<tr><td colspan="8" class="empty">لا توجد بيانات.</td></tr>' }
+      <tr class="totalrow"><td>الإجمالي</td><td class="n">${AR(T.sn)}</td><td class="n">${EGP(T.sv)}</td><td></td>
+        <td class="n">${AR(T.rn)}</td><td class="n">${EGP(T.rv)}</td><td></td><td class="n">${EGP(T.net)}</td></tr>
+    </tbody></table></div>`;
+}
+
+/* ٣ — كشف حساب مستقل لكل فرع */
+function repStmt(){
+  const bid = S.RF.branch==='all' ? BRANCHES[0].id : +S.RF.branch;
+  const b = BRANCHES.find(x=>x.id===bid);
+  const open = OPEN_BR.find(x=>x.id===bid);
+  const [f,t]=rfRange();
+  const mv = MOVES.filter(m=>m.at>=f && m.at<=t &&
+    ((m.bid===bid && ['sale','return','receipt','count'].includes(m.kind)) ||
+     (m.kind==='transfer' && (m.to===bid || m.bid===bid))))
+    .sort((a,b2)=>a.at-b2.at);
+  let run = open.account;
+  const lines = mv.map(m=>{
+    let desc='', dr=0, cr=0;
+    if (m.kind==='transfer' && m.to===bid) { desc='بضاعة واردة من '+locName(m.from!=null?m.from:WH_ID); dr=m.value; }
+    else if (m.kind==='transfer')          { desc='بضاعة صادرة إلى '+locName(m.to); cr=m.value; }
+    else if (m.kind==='receipt')           { desc='توريد مباشر من '+(m.supplier||'مورّد'); dr=m.value; }
+    else if (m.kind==='sale')              { desc='مبيعات محصّلة'; cr=m.value; }
+    else if (m.kind==='return')            { desc='مرتجع عميل'; dr=m.value; }
+    else                                   { desc='تسوية جرد — '+(m.reason||''); dr=m.value; }
+    run += dr-cr;
+    return { m, desc, dr, cr, run };
+  });
+  const tdr = lines.reduce((a,l)=>a+l.dr,0), tcr = lines.reduce((a,l)=>a+l.cr,0);
+  return `<div class="sechead"><div><h2>كشف حساب الفرع</h2>
+    <span class="sub">حساب جارٍ مستقل لكل فرع مع الإدارة الرئيسية</span></div></div>
+  ${rfBar(true)}
+  <div class="notice"><span>🧾</span><div>الفرع <b>مدين</b> بما يستلمه من بضاعة وبالمرتجعات، و<b>دائن</b> بما يحصّله من مبيعات ويورّده. ${ S.RF.branch==='all' ? 'يُعرض أول فرع — اختر فرعاً من الفلتر أعلاه.' : '' }</div></div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">الفرع</span><span class="val" style="font-size:19px">${esc(b.name)}</span><span class="meta">${esc(b.manager)}</span></div>
+    <div class="tile"><span class="lbl">رصيد أول المدة</span><span class="val">${EGP(open.account)}</span><span class="meta">مدين</span></div>
+    <div class="tile"><span class="lbl">إجمالي المدين</span><span class="val">${EGP(tdr)}</span><span class="meta">بضاعة ومرتجعات</span></div>
+    <div class="tile"><span class="lbl">إجمالي الدائن</span><span class="val">${EGP(tcr)}</span><span class="meta">تحصيلات</span></div>
+    <div class="tile"><span class="lbl">الرصيد الختامي</span><span class="val">${EGP(Math.abs(run))}</span><span class="meta">${run>=0?'مدين — على الفرع':'دائن — للفرع'}</span></div>
+  </div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>المستند</th><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
+    <tbody>
+      <tr class="totalrow"><td></td><td class="sub">${dmy(new Date(S.RF.from+'T12:00:00'))}</td>
+        <td>رصيد أول المدة</td><td class="n">${EGP(open.account)}</td><td class="n">—</td>
+        <td class="n">${EGP(open.account)}</td></tr>
+      ${ lines.length ? lines.map(l=>`<tr><td class="code">${l.m.id}</td><td class="sub">${dmy(l.m.at)}</td>
+        <td>${esc(l.desc)}</td><td class="n">${l.dr?EGP(l.dr):'—'}</td><td class="n">${l.cr?EGP(l.cr):'—'}</td>
+        <td class="n" style="font-weight:700">${EGP(Math.abs(l.run))}</td></tr>`).join('')
+        : '<tr><td colspan="6" class="empty">لا توجد حركات في الفترة.</td></tr>' }
+      <tr class="totalrow"><td></td><td></td><td>الإجمالي</td><td class="n">${EGP(tdr)}</td>
+        <td class="n">${EGP(tcr)}</td><td class="n">${EGP(Math.abs(run))}</td></tr>
+    </tbody></table></div>`;
+}
+
+/* ٤ — البحث عن أي صنف ومعرفة مكانه وكميته */
+function repFind(){
+  const q=S.findQ.trim();
+  const hits = q ? STYLES.filter(s=>s.name.includes(q)||s.code.includes(q)||s.cat.includes(q)) : STYLES;
+  const sel = S.findCode ? styleBy(S.findCode) : null;
+  let body='';
+  if (sel){
+    const locs = [[WH_ID,'المخزن الرئيسي'], ...BRANCHES.map(b=>[b.id,b.name])]
+      .map(([id,n])=>({ id, n, q:branchQty(id,sel.code) }));
+    const tot = locs.reduce((a,l)=>a+l.q,0);
+    const withStock = locs.filter(l=>l.q>0).length;
+    const maxQ = Math.max(...locs.map(l=>l.q),1);
+    body = `
+    <div class="sechead"><div><h2 style="font-size:18px">${esc(sel.name)} <span class="code">${sel.code}</span></h2>
+      <span class="sub">${esc(sel.cat)} · ${esc(sel.season)} · ${AR(sel.colors.length*sel.sizes.length)} متغيّر</span></div>
+      <button class="backlink" id="find-back">↩ بحث جديد</button></div>
+    <div class="tiles">
+      <div class="tile"><span class="lbl">الكمية الكلية</span><span class="val">${AR(tot)}</span><span class="meta">كل المواقع</span></div>
+      <div class="tile"><span class="lbl">المخزن الرئيسي</span><span class="val">${AR(branchQty(WH_ID,sel.code))}</span><span class="meta">قبل التوزيع</span></div>
+      <div class="tile"><span class="lbl">مواقع بها رصيد</span><span class="val">${AR(withStock)}</span><span class="meta">من ${AR(16)}</span></div>
+      <div class="tile"><span class="lbl">قيمة المخزون</span><span class="val">${EGP(tot*sel.cost)}</span><span class="meta">بالتكلفة</span></div>
+    </div>
+    <div class="row" style="align-items:flex-start; gap:18px">
+      <div style="flex:1 1 360px; min-width:0">
+        <div class="sechead"><h2 style="font-size:16px">أين يوجد</h2></div>
+        <div class="tscroll tall"><table><thead><tr><th>الموقع</th><th>الكمية</th><th></th><th>القيمة</th><th>الحالة</th></tr></thead>
+          <tbody>${locs.sort((a,b)=>b.q-a.q).map(l=>`<tr><td style="font-weight:${l.id===WH_ID?'700':'400'}">${esc(l.n)}</td>
+            <td class="n">${AR(l.q)}</td>
+            <td style="width:100px"><div class="minibar"><i style="width:${(l.q/maxQ*100).toFixed(1)}%"></i></div></td>
+            <td class="n">${EGP(l.q*sel.cost)}</td>
+            <td><span class="badge ${l.q===0?'b-loud':l.q<=sel.reorder?'b-mark':'b-quiet'}">${l.q===0?'نفد':l.q<=sel.reorder?'تحت الحد':'متاح'}</span></td></tr>`).join('')}
+          </tbody></table></div></div>
+      <div style="flex:1 1 300px; min-width:0">
+        <div class="sechead"><h2 style="font-size:16px">حسب المقاس واللون — كل المواقع</h2></div>
+        ${gridHTML(sel.code, null, false, false)}</div>
+    </div>`;
+  } else {
+    body = `<div class="tscroll tall"><table>
+      <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>المخزن الرئيسي</th><th>بالفروع</th><th>الإجمالي</th><th>مواقع بها رصيد</th></tr></thead>
+      <tbody>${ hits.length ? hits.map(s=>{ const w=branchQty(WH_ID,s.code), br=totalQty(s.code);
+        const nLoc = BRANCHES.filter(b=>branchQty(b.id,s.code)>0).length + (w>0?1:0);
+        return `<tr class="clickable" data-find="${s.code}"><td class="code">${s.code}</td>
+          <td style="font-weight:700">${esc(s.name)}</td><td class="sub">${esc(s.cat)}</td>
+          <td class="n">${AR(w)}</td><td class="n">${AR(br)}</td>
+          <td class="n" style="font-weight:700">${AR(w+br)}</td><td class="n sub">${AR(nLoc)}</td></tr>`;}).join('')
+        : '<tr><td colspan="7" class="empty">لا يوجد صنف مطابق.</td></tr>' }
+      </tbody></table></div>`;
+  }
+  return `<div class="sechead"><div><h2>تتبّع صنف</h2>
+    <span class="sub">ابحث عن أي صنف واعرف مكانه وكميته فوراً</span></div></div>
+  <div class="row"><input class="srch" id="find-q" placeholder="اكتب اسم الصنف أو الكود أو التصنيف..."
+    value="${esc(S.findQ)}" style="flex:1; max-width:420px">
+    <span class="sub">${AR(hits.length)} نتيجة</span></div>
+  ${body}`;
 }
 
 /* ============================================================
@@ -1219,7 +1596,7 @@ function viewSell(){
   <div class="poswrap">
     <div class="pgrid">${list.map(s=>{ const av=branchQty(S.branch,s.code);
       return `<button class="pcard" data-p="${s.code}" ${av===0?'disabled style="opacity:.5"':''}>
-        <span class="nm">${esc(s.name)}</span><span class="pr">${EGP(s.price)}</span>
+        ${pthumb(s)}<span class="nm">${esc(s.name)}</span><span class="pr">${EGP(s.price)}</span>
         <span class="av">${av===0?'غير متوفر':'متاح '+AR(av)+' قطعة'}</span></button>`;}).join('')}</div>
     <div class="card cart">
       <div class="cart-head"><h3 style="font-size:16px">الفاتورة</h3><span class="sub">${AR(items)} قطعة</span></div>
@@ -1279,6 +1656,38 @@ function viewLog(){
     </tbody></table></div>`;
 }
 
+/* ---------- صور الأصناف ---------- */
+const GARMENT = '👗';
+function thumb(s2, big){
+  const cls = big ? ' thumb-lg' : '';
+  return s2 && s2.img
+    ? `<img class="thumb${cls}" src="${s2.img}" alt="${esc(s2.name)}">`
+    : `<div class="thumb-ph${cls}" title="لا توجد صورة">${GARMENT}</div>`;
+}
+function pthumb(s2){
+  return s2.img ? `<img class="pthumb" src="${s2.img}" alt="${esc(s2.name)}">`
+                : `<div class="pthumb-ph">${GARMENT}</div>`;
+}
+/* تصغير الصورة قبل تخزينها حتى لا تثقل الصفحة */
+function readImage(file, cb){
+  if(!file || !/^image\//.test(file.type)) { cb(null); return; }
+  const fr = new FileReader();
+  fr.onload = () => {
+    const im = new Image();
+    im.onload = () => {
+      const max = 420, sc = Math.min(1, max/Math.max(im.width, im.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(im.width*sc); c.height = Math.round(im.height*sc);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      try { cb(c.toDataURL('image/jpeg', 0.82)); } catch(e){ cb(fr.result); }
+    };
+    im.onerror = () => cb(null);
+    im.src = fr.result;
+  };
+  fr.onerror = () => cb(null);
+  fr.readAsDataURL(file);
+}
+
 /* ---------- شبكة المقاسات ---------- */
 function tone(q){ return q===0?'q0': q<=3?'q1': q<=9?'q2':'q3'; }
 function gridHTML(code,bid,clickable,withCodes){
@@ -1323,12 +1732,19 @@ function wire(){
   document.querySelectorAll('[data-bv]').forEach(b=> b.onclick=()=>{ S.bview=b.dataset.bv; render(); });
   document.querySelectorAll('[data-av]').forEach(b=> b.onclick=()=>{ S.accview=b.dataset.av; S.ledger=null; render(); });
   document.querySelectorAll('[data-wv]').forEach(b=> b.onclick=()=>{ S.whview=b.dataset.wv; S.q=''; render(); });
+  document.querySelectorAll('[data-rv]').forEach(b=> b.onclick=()=>{ S.repview=b.dataset.rv; S.findCode=null; render(); });
+  ['r-from','r-to','r-branch'].forEach(id=>{ const el=$('#'+id); if(el) el.onchange=e=>{
+    S.RF[id==='r-from'?'from':id==='r-to'?'to':'branch']=e.target.value; render(); }; });
+  const rr=$('#r-reset'); if(rr) rr.onclick=()=>{ S.RF={from:iso(dayKey(6)),to:iso(dayKey(0)),branch:'all'}; render(); };
+  document.querySelectorAll('tr[data-find]').forEach(r=> r.onclick=()=>{ S.findCode=r.dataset.find; render(); });
+  const fb=$('#find-back'); if(fb) fb.onclick=()=>{ S.findCode=null; render(); };
   document.querySelectorAll('tr[data-acc]').forEach(r=> r.onclick=()=>{ S.ledger=r.dataset.acc; render(); });
 
   const keepFocus=(id,fn)=>{ const el=$('#'+id); if(!el) return;
     el.oninput=e=>{ const p=e.target.selectionStart; fn(e.target.value); render();
       const n=$('#'+id); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(err){} } }; };
   keepFocus('sq', v=>S.q=v); keepFocus('sq2', v=>S.sq=v);
+  keepFocus('find-q', v=>{ S.findQ=v; S.findCode=null; });
   keepFocus('f-q', v=>S.F.q=v);
   ['f-from','f-to','f-branch'].forEach(id=>{ const el=$('#'+id); if(el) el.onchange=e=>{
     S.F[id==='f-from'?'from':id==='f-to'?'to':'branch']=e.target.value; render(); }; });
@@ -1345,7 +1761,8 @@ function wire(){
   document.querySelectorAll('[data-wf]').forEach(b=> b.onclick=()=> openWF(b.dataset.wf));
   document.querySelectorAll('tr[data-s]').forEach(r=> r.onclick=()=>{ const s=styleBy(r.dataset.s);
     openModal(esc(s.name)+' <span class="code">'+s.code+'</span>',
-      `<p class="sub">${esc(s.cat)} · ${esc(s.season)} · المورّد ${esc(s.supplier)} · تكلفة ${EGP(s.cost)} · بيع ${EGP(s.price)}</p>
+      `<div class="row" style="gap:14px; align-items:flex-start">${thumb(s,true)}
+         <p class="sub" style="flex:1; min-width:0">${esc(s.cat)} · ${esc(s.season)}<br>المورّد ${esc(s.supplier)}<br>تكلفة ${EGP(s.cost)} · بيع ${EGP(s.price)}</p></div>
        ${gridHTML(s.code,null,false,true)}
        <h4 style="font-size:14px">التوزيع على الفروع</h4>
        <div class="tscroll"><table><thead><tr><th>الفرع</th><th>الكمية</th><th>حد الطلب</th><th>قيمة المخزون</th><th>الحالة</th></tr></thead>

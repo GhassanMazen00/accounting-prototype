@@ -20,9 +20,9 @@ Open it and use the switcher at the top. It has four workstations, one per role:
 
 | Workstation | What it does |
 |---|---|
-| **الإدارة الرئيسية** | Dashboard, all 15 branches with full history, plus read-only copies of the warehouse and the books |
+| **الإدارة الرئيسية** | Dashboard, all 15 branches with full history, four control reports, plus read-only copies of the warehouse and the books |
 | **شاشة المخزن** | Item master with size/colour variants, barcodes and pricing; goods receipts, transfers, stock counts |
-| **شاشة المحاسب** | Chart of accounts, journal, trial balance, income statement, balance sheet, suppliers |
+| **شاشة المحاسب** | Opening balances, daily revenue and expenses, supplier and customer debts, chart of accounts, journal, trial balance, income statement, balance sheet |
 | **شاشة الفرع** | The shop floor: sell, own stock, returns, and a rolling 30-day log |
 
 ### Things worth clicking
@@ -37,11 +37,18 @@ Open it and use the switcher at the top. It has four workstations, one per role:
   credits. Post one and the trial balance and balance sheet both move.
 - **الإدارة الرئيسية → الفروع → حركات كل الفروع** — every movement across all branches,
   filtered by date range, branch, movement type and free text.
+- **الإدارة الرئيسية → التقارير** — goods shipped to each branch per day, sales against
+  returns per branch, a running current-account statement per branch, and an item
+  tracker that finds any style's quantity in all sixteen locations at once.
+- **شاشة المخزن → + صنف جديد → صورة الصنف** — attach a photo; it is downscaled in the
+  browser and then appears in the stock table and on the till.
 
 ### How it is built
 
 One HTML file, no framework and no build step. Deterministic seeded dummy data:
-15 branches, 14 styles with ~196 variants, 90 days of sales, and a 21-account ledger.
+15 branches plus a central warehouse, 14 styles with ~196 variants, 90 days of movements
+across five movement types, and a 21-account ledger. Opening balances per branch and per
+supplier reconcile exactly to the opening journal entry.
 Every report is derived from the journal rather than hard-coded, so the trial balance
 foots and the balance sheet balances. Colour is deliberately absent — state is carried
 by weight, fill and border instead, so the interface reads the same in light and dark.
