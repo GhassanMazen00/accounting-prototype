@@ -1,0 +1,1405 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="نسخة تجريبية لنظام Marshmallow — إدارة رئيسية ومخزن ومحاسبة وخمسة عشر فرعاً. بيانات وهمية بالكامل.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%23141416%27%2F%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%276%27%20fill%3D%27%23fff%27%2F%3E%3C%2Fsvg%3E">
+  <style>
+    :root { color-scheme: light;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px); }
+    body { margin: 0; font: 14px system-ui, sans-serif; }
+    img { max-width: 100%; }
+    [hidden] { display: none !important; }
+  </style>
+<title>Marshmallow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Tajawal:wght@400;500;700&display=swap">
+<style>
+  /* Layout: RTL app shell — monochrome. Top bar with console/branch switch, tab row, 1320px column.
+     No hue anywhere: state is carried by weight, fill and border style, never colour. */
+  :root {
+    --bg:#f7f7f8; --surface:#ffffff; --surface-2:#f1f1f3; --surface-3:#e6e6ea;
+    --ink:#141416; --ink-2:#5c5c63; --ink-3:#8e8e96;
+    --line:#e3e3e7; --line-2:#cdcdd3;
+    --accent:#141416; --on-accent:#ffffff;
+    --shadow:0 1px 2px rgba(20,20,22,.05), 0 4px 14px rgba(20,20,22,.05);
+    --radius:12px;
+    --font:"Tajawal", system-ui, "Segoe UI", sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0e0e10; --surface:#161618; --surface-2:#1e1e21; --surface-3:#2a2a2f;
+      --ink:#f2f2f4; --ink-2:#a8a8b0; --ink-3:#74747c;
+      --line:#2a2a2e; --line-2:#3c3c43;
+      --accent:#f2f2f4; --on-accent:#141416;
+      --shadow:0 1px 2px rgba(0,0,0,.45), 0 4px 16px rgba(0,0,0,.4);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0e0e10; --surface:#161618; --surface-2:#1e1e21; --surface-3:#2a2a2f;
+    --ink:#f2f2f4; --ink-2:#a8a8b0; --ink-3:#74747c;
+    --line:#2a2a2e; --line-2:#3c3c43;
+    --accent:#f2f2f4; --on-accent:#141416;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 4px 16px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); font-family:var(--font); direction:rtl;
+         font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; }
+  h1,h2,h3,h4 { margin:0; line-height:1.25; font-weight:700; }
+  p { margin:0; }
+  button { font-family:inherit; font-size:inherit; cursor:pointer; }
+  input, select, textarea { font-family:inherit; font-size:14px; }
+
+  .topbar { position:sticky; top:env(safe-area-inset-top,0px); z-index:30;
+    background:color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter:saturate(160%) blur(10px);
+    border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;
+    gap:14px; flex-wrap:wrap; padding:11px 20px; }
+  .brandmark { display:flex; align-items:center; gap:10px; }
+  .dot { width:11px; height:11px; border-radius:50%; background:var(--accent); flex:none; }
+  .wordmark { font-size:19px; font-weight:700; letter-spacing:-.01em; }
+  .chip-demo { font-size:10.5px; font-weight:700; letter-spacing:.06em; background:var(--surface-2);
+    color:var(--ink-2); padding:3px 9px; border-radius:999px; border:1px solid var(--line-2); }
+  .topright { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .seg { display:flex; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:3px; gap:3px; }
+  .seg button { border:none; background:none; color:var(--ink-2); padding:6px 14px; border-radius:6px; font-weight:500; font-size:14px; }
+  .seg button[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); font-weight:700; }
+  select.pick, input.fld, select.fld { padding:7px 11px; border:1px solid var(--line-2); border-radius:8px;
+    background:var(--surface); color:var(--ink); }
+  input.fld:focus, select.fld:focus, select.pick:focus, .srch:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  .iconbtn { border:1px solid var(--line-2); background:var(--surface); color:var(--ink); width:36px; height:36px;
+    border-radius:8px; font-size:15px; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+
+  .tabrow { display:flex; gap:4px; overflow-x:auto; padding:12px 20px 0; border-bottom:1px solid var(--line);
+    background:var(--bg); position:sticky; top:calc(env(safe-area-inset-top,0px) + 58px); z-index:20; }
+  .tabrow button { border:none; background:none; color:var(--ink-2); white-space:nowrap; padding:9px 15px;
+    border-radius:8px 8px 0 0; font-weight:500; font-size:14.5px; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tabrow button:hover { color:var(--ink); background:var(--surface-2); }
+  .tabrow button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--accent); font-weight:700; }
+
+  .subnav { display:flex; gap:6px; flex-wrap:wrap; }
+  .subnav button { border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
+    padding:6px 13px; border-radius:999px; font-size:13.5px; font-weight:500; }
+  .subnav button[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); border-color:var(--accent); font-weight:700; }
+
+  .wrap { max-width:1320px; margin-inline:auto; padding-inline:20px; padding-block:24px 64px; }
+  .stack { display:flex; flex-direction:column; gap:22px; }
+  .stack-s { display:flex; flex-direction:column; gap:12px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .sechead { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .sechead h2 { font-size:19px; }
+  .sub { color:var(--ink-3); font-size:13.5px; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .card-pad { padding:18px; }
+
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:12px; }
+  .tile { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:15px 16px;
+    display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .tile .lbl { font-size:12.5px; color:var(--ink-3); font-weight:500; }
+  .tile .val { font-size:23px; font-weight:700; letter-spacing:-.015em; font-variant-numeric:tabular-nums; }
+  .tile .meta { font-size:12px; color:var(--ink-3); }
+
+  .tscroll { overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); }
+  .tscroll.tall { max-height:560px; overflow-y:auto; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { text-align:right; padding:10px 13px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  thead th { font-size:12px; font-weight:500; color:var(--ink-3); background:var(--surface-2); position:sticky; top:0; z-index:1; }
+  tbody tr:last-child td { border-bottom:none; }
+  tbody tr.clickable { cursor:pointer; }
+  tbody tr.clickable:hover { background:var(--surface-2); }
+  tr.totalrow td { font-weight:700; background:var(--surface-2); }
+  .n { font-variant-numeric:tabular-nums; }
+  .code { font-family:var(--mono); font-size:12.5px; color:var(--ink-3); direction:ltr; display:inline-block; }
+
+  /* الحالات بالوزن لا باللون */
+  .badge { display:inline-block; font-size:12px; font-weight:500; padding:2px 9px; border-radius:999px;
+           border:1px solid transparent; }
+  .b-quiet { background:var(--surface-2); color:var(--ink-3); }
+  .b-mark  { background:var(--surface); color:var(--ink); border-color:var(--line-2); font-weight:700; }
+  .b-loud  { background:var(--accent); color:var(--on-accent); font-weight:700; }
+  .b-dash  { background:var(--surface); color:var(--ink-2); border:1px dashed var(--line-2); }
+
+  .minibar { height:6px; border-radius:3px; background:var(--surface-3); overflow:hidden; min-width:90px; }
+  .minibar i { display:block; height:100%; background:var(--accent); border-radius:3px; }
+
+  .btn { border:1px solid var(--line-2); background:var(--surface); color:var(--ink); padding:9px 15px;
+         border-radius:9px; font-weight:500; }
+  .btn:hover { background:var(--surface-2); }
+  .btn-primary { background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700; }
+  .btn-primary:hover { opacity:.88; }
+  .btn:disabled, .btn-primary:disabled { opacity:.4; cursor:not-allowed; }
+  .btn-sm { padding:6px 11px; font-size:13.5px; }
+
+  .notice { display:flex; gap:10px; align-items:flex-start; background:var(--surface-2);
+    border:1px solid var(--line); border-inline-start:3px solid var(--accent); border-radius:10px;
+    border-start-start-radius:0; border-end-start-radius:0;
+    padding:12px 15px; font-size:13.5px; color:var(--ink-2); }
+  .notice b { color:var(--ink); }
+
+  .chartbox { position:relative; }
+  svg.chart { display:block; width:100%; height:auto; direction:ltr; }
+  .tip { position:absolute; pointer-events:none; opacity:0; transition:opacity .12s; background:var(--accent);
+    color:var(--on-accent); font-size:12.5px; font-weight:500; padding:6px 10px; border-radius:7px;
+    white-space:nowrap; transform:translate(-50%,-130%); z-index:5; }
+  .tip.on { opacity:1; }
+
+  /* شبكة المقاسات والألوان — تدرّج رمادي للكمية، وإطار متقطّع للصفر */
+  .vgrid { border-collapse:separate; border-spacing:3px; }
+  .vgrid th { background:none; font-size:12px; color:var(--ink-3); padding:4px 8px; position:static; }
+  .vgrid td { border:none; padding:0; }
+  .vcell { display:flex; align-items:center; justify-content:center; min-width:52px; height:40px;
+    border-radius:8px; font-weight:700; font-variant-numeric:tabular-nums; font-size:14px; border:1px solid var(--line); }
+  .vcell.q0 { background:var(--surface); color:var(--ink-3); border:1px dashed var(--line-2); }
+  .vcell.q1 { background:var(--surface-2); color:var(--ink-2); }
+  .vcell.q2 { background:var(--surface-3); color:var(--ink); }
+  .vcell.q3 { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+  button.vcell:hover:not(:disabled) { outline:2px solid var(--accent); outline-offset:1px; }
+  button.vcell:disabled { opacity:.55; cursor:not-allowed; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--ink-3); align-items:center; }
+  .legend i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-inline-end:5px; vertical-align:-2px; }
+
+  .poswrap { display:grid; grid-template-columns:1fr 340px; gap:18px; align-items:start; }
+  @media (max-width:940px){ .poswrap{ grid-template-columns:1fr; } }
+  .pgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(168px,1fr)); gap:11px; }
+  .pcard { background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:13px;
+    text-align:right; display:flex; flex-direction:column; gap:5px; min-width:0; }
+  .pcard:hover { border-color:var(--accent); box-shadow:var(--shadow); }
+  .pcard .nm { font-weight:700; font-size:14.5px; }
+  .pcard .pr { font-weight:700; font-variant-numeric:tabular-nums; font-size:14px; }
+  .pcard .av { font-size:11.5px; color:var(--ink-3); }
+  .cart { position:sticky; top:132px; display:flex; flex-direction:column; }
+  .cart-head { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  .cart-items { display:flex; flex-direction:column; max-height:330px; overflow-y:auto; }
+  .citem { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; padding:10px 16px;
+    border-bottom:1px solid var(--line); font-size:13.5px; }
+  .citem .cn b { display:block; font-size:13.5px; }
+  .citem .cn span { color:var(--ink-3); font-size:11.5px; }
+  .xbtn { border:none; background:none; color:var(--ink-3); font-size:16px; padding:0 4px; line-height:1; }
+  .xbtn:hover { color:var(--ink); }
+  .cart-foot { padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+  .ttl { display:flex; justify-content:space-between; font-size:13.5px; color:var(--ink-2); }
+  .ttl.grand { font-size:18px; font-weight:700; color:var(--ink); padding-top:9px; border-top:1px solid var(--line); }
+  .empty { padding:30px 16px; text-align:center; color:var(--ink-3); font-size:13.5px; }
+
+  .ovl { position:fixed; inset:0; background:rgba(10,10,12,.55); display:flex; align-items:center;
+    justify-content:center; padding:20px; z-index:50; }
+  .modal { background:var(--surface); border:1px solid var(--line); border-radius:14px; max-width:740px; width:100%;
+    max-height:88vh; overflow-y:auto; box-shadow:0 24px 60px rgba(0,0,0,.35); }
+  .modal.wide { max-width:940px; }
+  .modal-h { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:16px 18px;
+    border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--surface); z-index:2; }
+  .modal-b { padding:18px; display:flex; flex-direction:column; gap:16px; }
+
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--accent);
+    color:var(--on-accent); padding:11px 22px; border-radius:999px; font-weight:700; font-size:14px;
+    z-index:60; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+
+  .srch { padding:9px 13px; border:1px solid var(--line-2); border-radius:9px; background:var(--surface);
+    color:var(--ink); min-width:180px; }
+  .backlink { border:none; background:none; color:var(--ink); font-weight:700; padding:0; font-size:14px; text-decoration:underline; text-underline-offset:3px; }
+
+  /* الفلاتر */
+  .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; background:var(--surface);
+    border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
+  .f { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .f label { font-size:11.5px; color:var(--ink-3); font-weight:500; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chips button { border:1px solid var(--line-2); background:var(--surface); color:var(--ink-2);
+    padding:5px 11px; border-radius:999px; font-size:13px; font-weight:500; }
+  .chips button[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); border-color:var(--accent); font-weight:700; }
+
+  /* نموذج */
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+  .fieldset { border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:12px; }
+  .fieldset > h4 { font-size:13.5px; color:var(--ink-2); font-weight:700; }
+  .f-full { display:flex; flex-direction:column; gap:5px; }
+  .f-full label { font-size:12.5px; color:var(--ink-2); font-weight:500; }
+  .f-full input, .f-full select { width:100%; padding:9px 12px; border:1px solid var(--line-2);
+    border-radius:8px; background:var(--surface); color:var(--ink); }
+  .hint { font-size:12px; color:var(--ink-3); }
+  .jline { display:grid; grid-template-columns:1fr 130px 130px 32px; gap:8px; align-items:center; }
+  @media (max-width:700px){ .jline{ grid-template-columns:1fr 1fr; } }
+  .balrow { display:flex; justify-content:space-between; gap:12px; font-size:14px; padding:10px 12px;
+    background:var(--surface-2); border-radius:8px; font-variant-numeric:tabular-nums; }
+  .balrow.bad b { text-decoration:underline; text-decoration-style:wavy; text-underline-offset:3px; }
+  @media (prefers-reduced-motion: reduce){ * { transition:none !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="topbar">
+  <div class="brandmark"><span class="dot"></span><span class="wordmark">Marshmallow</span>
+    <span class="chip-demo">نسخة تجريبية</span></div>
+  <div class="topright">
+    <div class="seg" role="group" aria-label="اختيار الواجهة">
+      <button id="m-admin" aria-pressed="true">الإدارة الرئيسية</button>
+      <button id="m-wh" aria-pressed="false">شاشة المخزن</button>
+      <button id="m-acc" aria-pressed="false">شاشة المحاسب</button>
+      <button id="m-branch" aria-pressed="false">شاشة الفرع</button>
+    </div>
+    <select class="pick" id="bpick" hidden aria-label="اختيار الفرع"></select>
+    <button class="iconbtn" id="themer" aria-label="تبديل المظهر">◐</button>
+  </div>
+</div>
+<nav class="tabrow" id="tabs" role="tablist"></nav>
+<div class="wrap"><div id="view" class="stack"></div></div>
+<div id="layer"></div>
+
+<script>
+/* ============================================================
+   بيانات تجريبية ثابتة — وهمية بالكامل
+   ============================================================ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const R = mulberry32(72026);
+const ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+const pick=a=>a[Math.floor(R()*a.length)];
+const r5=n=>Math.round(n/5)*5;
+
+const AR  = n => (Math.round(Number(n)||0)).toLocaleString('ar-EG');
+const EGP = n => AR(n)+' ج.م';
+const KEGP= n => n>=1e6 ? AR(Math.round(n/1e5)/10)+' م' : n>=1000 ? AR(Math.round(n/1000))+' ألف' : AR(n);
+const arD = s => String(s).replace(/[0-9]/g, d=>'٠١٢٣٤٥٦٧٨٩'[d]);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dmy = d => d.toLocaleDateString('ar-EG',{day:'numeric',month:'long',year:'numeric'});
+const dm  = d => d.toLocaleDateString('ar-EG',{day:'numeric',month:'short'});
+const iso = d => { const z=new Date(d); z.setMinutes(z.getMinutes()-z.getTimezoneOffset()); return z.toISOString().slice(0,10); };
+
+const BRANCHES = [
+  ['الزمالك','القاهرة','نهى سامي'],['مصر الجديدة','القاهرة','ريهام فؤاد'],
+  ['المعادي','القاهرة','دينا عادل'],['مدينة نصر','القاهرة','منة الله حسن'],
+  ['التجمع الخامس','القاهرة الجديدة','سارة مجدي'],['المهندسين','الجيزة','ياسمين طارق'],
+  ['الشيخ زايد','الجيزة','هبة عمرو'],['٦ أكتوبر','الجيزة','مريم أشرف'],
+  ['الدقي','الجيزة','نورهان سعيد'],['سموحة','الإسكندرية','إيمان رضا'],
+  ['سان ستيفانو','الإسكندرية','أسماء كريم'],['طنطا','الغربية','فاطمة الزهراء'],
+  ['المنصورة','الدقهلية','رنا وليد'],['أسيوط','أسيوط','شيماء محمود'],
+  ['بورسعيد','بورسعيد','جيهان نبيل']
+].map((b,i)=>({id:i+1,name:b[0],city:b[1],manager:b[2],weight:0.55+R()*0.9}));
+const brName = id => (BRANCHES.find(b=>b.id===id)||{}).name || '—';
+
+const SIZES   = ['S','M','L','XL'];
+const PALETTE = ['أسود','أبيض','بيج','وردي','كحلي','زيتي','بني','نبيتي'];
+const CATS    = ['فساتين','بلوزات','بناطيل','تنانير','جاكيتات','تريكو'];
+const SEASONS = ['صيف ٢٠٢٦','ربيع ٢٠٢٦','شتاء ٢٠٢٥'];
+const SUPPLIERS = ['مصنع الدلتا للنسيج','شركة النيل للأقمشة','مجموعة الشرق للملابس','تكس بورت للاستيراد','مصنع المحلة الكبرى'];
+const SIZECODE = {S:'1',M:'2',L:'3',XL:'4'};
+
+let styleSeq = 1000;
+const STYLES = [
+  ['فستان كتان ميدي',1450,'فساتين'],['بلوزة حرير',890,'بلوزات'],
+  ['بنطلون واسع',980,'بناطيل'],    ['جاكيت دنيم',1650,'جاكيتات'],
+  ['تنورة بليسيه',1120,'تنانير'],  ['قميص قطن',760,'بلوزات'],
+  ['كارديجان صوف',1380,'تريكو'],   ['فستان سهرة',2750,'فساتين'],
+  ['توب كروب',540,'بلوزات'],       ['بنطلون جينز',1250,'بناطيل'],
+  ['عباية كاجوال',1890,'فساتين'],  ['جيب ميدي',1050,'تنانير'],
+  ['بلوفر تريكو',1190,'تريكو'],    ['فستان صيفي',1320,'فساتين']
+].map(s=>{
+  const n=ri(3,4), cols=[], pool=PALETTE.slice();
+  for(let i=0;i<n;i++) cols.push(pool.splice(Math.floor(R()*pool.length),1)[0]);
+  return { code:'MRS-'+(++styleSeq), name:s[0], price:s[1], cat:s[2],
+           cost:r5(s[1]*(0.38+R()*0.12)), colors:cols, sizes:SIZES.slice(),
+           season:pick(SEASONS), reorder:ri(40,70), supplier:pick(SUPPLIERS),
+           depth:0.5+R()*0.85 };
+});
+const styleBy = c => STYLES.find(s=>s.code===c);
+const vkey = (sz,cl)=> sz+'|'+cl;
+const colIdx = cl => String(PALETTE.indexOf(cl)+1).padStart(2,'0');
+const sku  = (s,sz,cl)=> s.code+'-'+SIZECODE[sz]+colIdx(cl);
+const bcode= (s,sz,cl)=> '62'+s.code.slice(4)+SIZECODE[sz]+colIdx(cl)+
+  String((s.code.slice(4)*7 + SIZECODE[sz]*3 + +colIdx(cl)) % 10000).padStart(4,'0');
+
+const STOCK = {};
+BRANCHES.forEach(b=>{ STOCK[b.id]={};
+  STYLES.forEach(s=>{ const m={}; const dep = R()<0.12;
+    s.colors.forEach(cl=> s.sizes.forEach(sz=>{
+      if(dep){ m[vkey(sz,cl)] = R()<0.45?0:ri(1,3); return; }
+      const base = R()<0.08?0:ri(1,16);
+      m[vkey(sz,cl)] = Math.round(base*s.depth*((sz==='M'||sz==='L')?1.4:1));
+    }));
+    STOCK[b.id][s.code]=m; });
+});
+const branchQty = (bid,code)=> Object.values(STOCK[bid][code]||{}).reduce((a,c)=>a+c,0);
+const totalQty  = code => BRANCHES.reduce((a,b)=>a+branchQty(b.id,code),0);
+const stockValue= bid => STYLES.reduce((a,s)=>a+branchQty(bid,s.code)*s.cost,0);
+/* المخزن الرئيسي: موقع مستقل عن الفروع، تدخله البضاعة من الموردين ثم تُوزَّع */
+const WH_ID = 0;
+STOCK[WH_ID] = {};
+STYLES.forEach(s=>{ const m={}; s.colors.forEach(cl=> s.sizes.forEach(sz=>{ m[vkey(sz,cl)]=ri(20,90); }));
+  STOCK[WH_ID][s.code]=m; });
+const locName = id => +id===WH_ID ? 'المخزن الرئيسي' : brName(+id);
+const LOCS = () => [[WH_ID,'المخزن الرئيسي'], ...BRANCHES.map(b=>[b.id,b.name])];
+const qtyAt = (loc,code,sz,cl) => (STOCK[+loc] && STOCK[+loc][code]) ? (STOCK[+loc][code][vkey(sz,cl)]||0) : 0;
+const whTotal = () => STYLES.reduce((a,s)=>a+branchQty(WH_ID,s.code),0);
+
+const COMBOS=[]; BRANCHES.forEach(b=>STYLES.forEach(s=>COMBOS.push({b,s,q:branchQty(b.id,s.code)})));
+COMBOS.sort((a,b)=>a.q-b.q);
+const LOW_B = Math.round(COMBOS[Math.floor(COMBOS.length/2)].q*0.45);
+
+/* ---------- المبيعات اليومية ---------- */
+const DAYS=90;
+const dayKey = d => { const x=new Date(); x.setDate(x.getDate()-d); x.setHours(0,0,0,0); return x; };
+const DAILY={};
+BRANCHES.forEach(b=>{ DAILY[b.id]=[];
+  for(let d=DAYS-1; d>=0; d--){ const dt=dayKey(d), w=(dt.getDay()>=4&&dt.getDay()<=6)?1.45:1;
+    DAILY[b.id].push({d:dt,total:Math.round(r5(b.weight*w*(1+(DAYS-d)/DAYS*0.18)*ri(9000,21000)))}); }});
+const dailyAll = () => DAILY[1].map((_,i)=>({d:DAILY[1][i].d,total:BRANCHES.reduce((a,b)=>a+DAILY[b.id][i].total,0)}));
+const monthSales = bid => DAILY[bid].slice(-30).reduce((a,x)=>a+x.total,0);
+const todaySales = bid => DAILY[bid][DAILY[bid].length-1].total;
+
+/* ---------- سجل الحركات الموحّد (كل الأنواع، كل الفروع، ٩٠ يوماً) ---------- */
+const MTYPES = {
+  sale:     {label:'بيع',    sign:-1},
+  return:   {label:'مرتجع',  sign:+1},
+  receipt:  {label:'توريد',  sign:+1},
+  transfer: {label:'تحويل',  sign:0},
+  count:    {label:'جرد',    sign:0}
+};
+let mSeq=4100;
+const MOVES=[];
+const PREFIX = {sale:'INV',return:'RET',receipt:'GRN',transfer:'TRF',count:'ADJ'};
+function mkMove(bid,dt,kind,s,sz,cl,qty,extra){
+  const m = { id: PREFIX[kind]+'-'+String(bid).padStart(2,'0')+'-'+(++mSeq),
+    at:dt, bid, kind, code:s.code, name:s.name, size:sz, color:cl, qty,
+    value: kind==='receipt'||kind==='count' ? qty*s.cost : qty*s.price,
+    by: (BRANCHES.find(b=>b.id===bid)||{}).manager || '—' };
+  Object.assign(m, extra||{}); MOVES.push(m); return m;
+}
+BRANCHES.forEach(b=>{
+  for(let d=DAYS-1; d>=0; d--){
+    const dt0 = dayKey(d);
+    const mk = (h)=>{ const x=new Date(dt0); x.setHours(h, ri(0,59)); return x; };
+    for(let i=0;i<ri(2,5);i++){ const s=pick(STYLES);
+      mkMove(b.id, mk(ri(11,21)), R()<0.07?'return':'sale', s, pick(s.sizes), pick(s.colors), ri(1,2),
+        {pay: pick(['كاش','كاش','فيزا','انستاباي'])}); }
+    if (R()<0.11){ const s=pick(STYLES);
+      mkMove(b.id, mk(ri(9,12)), 'receipt', s, pick(s.sizes), pick(s.colors), ri(8,40), {supplier:s.supplier}); }
+    if (R()<0.07){ const s=pick(STYLES), to=pick(BRANCHES.filter(x=>x.id!==b.id));
+      mkMove(b.id, mk(ri(10,16)), 'transfer', s, pick(s.sizes), pick(s.colors), ri(2,10), {to:to.id}); }
+    if (R()<0.03){ const s=pick(STYLES);
+      mkMove(b.id, mk(ri(18,21)), 'count', s, pick(s.sizes), pick(s.colors), ri(1,4),
+        {reason: pick(['فرق جرد','تالف','مفقود'])}); }
+  }
+});
+MOVES.sort((a,b)=>b.at-a.at);
+const movesOf = bid => MOVES.filter(m=>m.bid===bid);
+const last30Of = bid => { const cut=dayKey(29); return movesOf(bid).filter(m=>m.at>=cut); };
+
+/* ============================================================
+   المحاسبة — دليل حسابات وقيود متوازنة، وكل التقارير تُشتق منها
+   ============================================================ */
+const COA = [
+  ['1110','النقدية بالخزينة','asset','الأصول المتداولة'],
+  ['1120','البنك','asset','الأصول المتداولة'],
+  ['1130','ذمم مدينة — عملاء','asset','الأصول المتداولة'],
+  ['1140','المخزون','asset','الأصول المتداولة'],
+  ['1210','أثاث وتجهيزات الفروع','asset','الأصول الثابتة'],
+  ['1220','مجمع إهلاك الأثاث','contra_asset','الأصول الثابتة'],
+  ['2110','الموردون','liability','الخصوم المتداولة'],
+  ['2120','ضريبة القيمة المضافة','liability','الخصوم المتداولة'],
+  ['2130','مصروفات مستحقة','liability','الخصوم المتداولة'],
+  ['3110','رأس المال','equity','حقوق الملكية'],
+  ['3120','أرباح محتجزة','equity','حقوق الملكية'],
+  ['4110','إيرادات المبيعات','revenue','الإيرادات'],
+  ['4120','مردودات المبيعات','contra_revenue','الإيرادات'],
+  ['5110','تكلفة البضاعة المباعة','expense','تكلفة المبيعات'],
+  ['5210','إيجارات الفروع','expense','مصروفات تشغيلية'],
+  ['5220','رواتب وأجور','expense','مصروفات تشغيلية'],
+  ['5230','كهرباء ومياه','expense','مصروفات تشغيلية'],
+  ['5240','تسويق وإعلان','expense','مصروفات تشغيلية'],
+  ['5250','نقل وشحن','expense','مصروفات تشغيلية'],
+  ['5260','مصروفات متنوعة','expense','مصروفات تشغيلية'],
+  ['5270','إهلاك','expense','مصروفات تشغيلية']
+].map(a=>({code:a[0],name:a[1],type:a[2],group:a[3]}));
+const accBy = c => COA.find(a=>a.code===c);
+const DEBIT_NATURE = { asset:1, expense:1, contra_revenue:1, contra_asset:-1, liability:-1, equity:-1, revenue:-1 };
+
+let jSeq=0;
+const JOURNAL=[];
+function je(date, desc, lines, src){
+  const dr = lines.reduce((a,l)=>a+(l.dr||0),0), cr = lines.reduce((a,l)=>a+(l.cr||0),0);
+  if (Math.abs(dr-cr) > 0.5) { const diff = Math.round(dr-cr);
+    lines.push(diff>0 ? {acc:'3110',dr:0,cr:diff} : {acc:'3110',dr:-diff,cr:0}); }
+  JOURNAL.push({ id:'JV-'+String(++jSeq).padStart(4,'0'), date, desc, src: src||'تلقائي',
+                 lines: lines.map(l=>({acc:l.acc, dr:Math.round(l.dr||0), cr:Math.round(l.cr||0)})) });
+}
+(function buildBooks(){
+  const openInv = BRANCHES.reduce((a,b)=>a+stockValue(b.id),0);
+  je(dayKey(DAYS-1), 'أرصدة افتتاحية', [
+    {acc:'1110',dr:780000}, {acc:'1120',dr:2150000}, {acc:'1140',dr:openInv},
+    {acc:'1210',dr:4200000}, {acc:'1220',cr:880000}, {acc:'2110',cr:2380000}
+  ], 'افتتاحي');
+
+  for (let mo=2; mo>=0; mo--){
+    const slice = dailyAll().slice(mo===0 ? -30 : -(30*(mo+1)), mo===0 ? undefined : -(30*mo));
+    const gross = slice.reduce((a,d)=>a+d.total,0);
+    const dt = slice[slice.length-1].d;
+    const label = dt.toLocaleDateString('ar-EG',{month:'long',year:'numeric'});
+    const vat  = Math.round(gross*14/114), net = gross-vat;
+    const cash = Math.round(gross*0.58), card = gross-cash;
+    je(dt, 'إثبات مبيعات الفروع — '+label,
+      [{acc:'1110',dr:cash},{acc:'1120',dr:card},{acc:'4110',cr:net},{acc:'2120',cr:vat}]);
+    const cogs = Math.round(net*0.43);
+    je(dt, 'تكلفة البضاعة المباعة — '+label, [{acc:'5110',dr:cogs},{acc:'1140',cr:cogs}]);
+    const rets = Math.round(gross*0.035);
+    je(dt, 'مردودات مبيعات — '+label, [{acc:'4120',dr:rets},{acc:'1110',cr:rets}]);
+    const purch = Math.round(cogs*1.15);
+    je(dt, 'مشتريات بضاعة من الموردين — '+label, [{acc:'1140',dr:purch},{acc:'2110',cr:purch}]);
+    [['5210','إيجارات الفروع',1250000,'1120'],['5220','رواتب وأجور',1450000,'1110'],
+     ['5230','كهرباء ومياه',240000,'1120'],['5240','تسويق وإعلان',310000,'1120'],
+     ['5250','نقل وشحن',120000,'1110'],['5260','مصروفات متنوعة',85000,'1110']]
+      .forEach(([a,nm,amt,cfrom])=> je(dt, nm+' — '+label, [{acc:a,dr:amt},{acc:cfrom,cr:amt}]));
+    je(dt, 'إهلاك الأثاث والتجهيزات — '+label, [{acc:'5270',dr:72000},{acc:'1220',cr:72000}]);
+    je(dt, 'إيداع نقدية الفروع بالبنك — '+label, [{acc:'1120',dr:3500000},{acc:'1110',cr:3500000}]);
+    je(dt, 'سداد دفعة للموردين — '+label, [{acc:'2110',dr:Math.round(purch*0.75)},{acc:'1120',cr:Math.round(purch*0.75)}]);
+    je(dt, 'توريد ضريبة القيمة المضافة — '+label, [{acc:'2120',dr:Math.round(vat*0.9)},{acc:'1120',cr:Math.round(vat*0.9)}]);
+  }
+})();
+
+const jLines = () => JOURNAL.flatMap(j=>j.lines.map(l=>({...l, j})));
+function accBal(code){
+  let dr=0, cr=0;
+  JOURNAL.forEach(j=>j.lines.forEach(l=>{ if(l.acc===code){ dr+=l.dr; cr+=l.cr; } }));
+  return { dr, cr, bal: dr-cr };
+}
+function trialBalance(){
+  return COA.map(a=>{ const b=accBal(a.code); return {...a, dr:b.dr, cr:b.cr,
+    netDr: b.bal>0?b.bal:0, netCr: b.bal<0?-b.bal:0 }; }).filter(r=>r.dr||r.cr);
+}
+const sumType = t => COA.filter(a=>a.type===t).reduce((s,a)=>s+Math.abs(accBal(a.code).bal),0);
+function pnl(){
+  const rev = Math.abs(accBal('4110').bal), retn = Math.abs(accBal('4120').bal);
+  const cogs= Math.abs(accBal('5110').bal);
+  const ops = COA.filter(a=>a.type==='expense' && a.code!=='5110')
+                 .map(a=>({...a, amt:Math.abs(accBal(a.code).bal)}));
+  const opex= ops.reduce((s,o)=>s+o.amt,0);
+  const net = rev-retn-cogs-opex;
+  return { rev, retn, netRev:rev-retn, cogs, gross:rev-retn-cogs, ops, opex, net };
+}
+function balanceSheet(){
+  const P = pnl();
+  /* أرصدة مُوقَّعة: الأصول موجبة بالمدين، والخصوم وحقوق الملكية موجبة بالدائن.
+     ما دام كل قيد متوازناً فإن الطرفين يتساويان حسابياً بالضرورة. */
+  const g = n => COA.filter(a=>a.group===n).map(a=>({...a, amt:accBal(a.code).bal})).filter(a=>Math.abs(a.amt)>0.5);
+  const ca = g('الأصول المتداولة'), fa = g('الأصول الثابتة');
+  const li = g('الخصوم المتداولة').map(a=>({...a, amt:-a.amt}));
+  const eq = g('حقوق الملكية').map(a=>({...a, amt:-a.amt}));
+  const assets = [...ca,...fa].reduce((s,a)=>s+a.amt,0);
+  const liab   = li.reduce((s,a)=>s+a.amt,0);
+  const equity = eq.reduce((s,a)=>s+a.amt,0) + P.net;
+  return { ca, fa, li, eq, assets, liab, equity, net:P.net, total: liab+equity };
+}
+
+/* ============================================================
+   الحالة
+   ============================================================ */
+const MODES       = ['admin','wh','acc','branch'];
+const ADMIN_TABS  = [['dash','لوحة التحكم'],['branches','الفروع'],['wh','المخزن'],['acc','الحسابات']];
+const BRANCH_TABS = [['sell','البيع'],['bstock','المخزون'],['rets','المرتجعات'],['log','سجل الشهر']];
+const WH_VIEWS    = [['items','الأصناف'],['grn','التوريد'],['trf','التحويلات'],['adj','الجرد']];
+let S = { mode:'admin', tab:'dash', branch:1, profile:null, cart:[], q:'', sq:'',
+          bview:'list', whview:'items', accview:'over', ledger:null,
+          F:{ from:iso(dayKey(29)), to:iso(dayKey(0)), branch:'all', types:{sale:1,return:1,receipt:1,transfer:1,count:1}, q:'' },
+          NI:null, JE:null, WF:null };
+const $ = s => document.querySelector(s);
+/* داخل الإدارة الرئيسية تُعرض شاشتا المخزن والحسابات للاطّلاع فقط */
+const RO = () => S.mode==='admin';
+
+function setMode(m){
+  S.mode=m; S.profile=null; S.q=''; S.sq=''; S.ledger=null; S.WF=null; S.NI=null; S.JE=null;
+  S.tab = m==='admin'?'dash' : m==='branch'?'sell' : m==='wh'?'items' : 'over';
+  if(m==='wh') S.whview='items';
+  if(m==='acc') S.accview='over';
+  MODES.forEach(k=> $('#m-'+k).setAttribute('aria-pressed', m===k));
+  $('#bpick').hidden = m!=='branch';
+  render();
+}
+MODES.forEach(k=> $('#m-'+k).onclick=()=>setMode(k));
+$('#bpick').innerHTML = BRANCHES.map(b=>`<option value="${b.id}">فرع ${esc(b.name)}</option>`).join('');
+$('#bpick').onchange = e=>{ S.branch=+e.target.value; S.cart=[]; render(); };
+$('#themer').onclick = ()=>{ const c=document.documentElement.getAttribute('data-theme');
+  const dark = c ? c==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-theme', dark?'light':'dark'); render(); };
+
+function tabList(){ return S.mode==='admin'?ADMIN_TABS : S.mode==='branch'?BRANCH_TABS
+                        : S.mode==='wh'?WH_VIEWS : ACC_VIEWS; }
+function curTab(){ return S.mode==='wh'?S.whview : S.mode==='acc'?S.accview : S.tab; }
+function setTab(k){ if(S.mode==='wh') S.whview=k; else if(S.mode==='acc') S.accview=k; else S.tab=k; }
+function renderTabs(){
+  $('#tabs').innerHTML = tabList().map(([k,l])=>
+    `<button role="tab" data-t="${k}" aria-selected="${curTab()===k&&!S.profile&&!S.ledger}">${l}</button>`).join('');
+  $('#tabs').querySelectorAll('button').forEach(b=> b.onclick=()=>{
+    setTab(b.dataset.t); S.profile=null; S.q=''; S.ledger=null; render(); });
+}
+const roBanner = n => `<div class="notice"><span>👁️</span><div>أنت في <b>الإدارة الرئيسية</b>: شاشة ${n} معروضة هنا <b>للاطّلاع فقط</b>. الإضافة والتعديل تتمّان من شاشة ${n} المستقلّة في أعلى الصفحة.</div></div>`;
+const whSubnav  = () => `<div class="subnav" role="group">${WH_VIEWS.map(([k,l])=>
+  `<button data-wv="${k}" aria-pressed="${S.whview===k}">${l}</button>`).join('')}</div>`;
+const accSubnav = () => `<div class="subnav" role="group">${ACC_VIEWS.map(([k,l])=>
+  `<button data-av="${k}" aria-pressed="${S.accview===k&&!S.ledger}">${l}</button>`).join('')}</div>`;
+function whBody(){ return ({items:whItems, grn:whGRN, trf:whTRF, adj:whADJ})[S.whview](); }
+function accBody(){ if(S.ledger) return ledgerPanel(S.ledger);
+  return ({over:accOver, coa:accCOA, je:accJE, tb:accTB, is:accIS, bs:accBS, ap:accAP})[S.accview](); }
+function render(){
+  renderTabs();
+  const v=$('#view');
+  if (S.mode==='admin'){
+    if (S.profile)          v.innerHTML = viewProfile(S.profile);
+    else if (S.tab==='wh')  v.innerHTML = roBanner('المخزن')   + whSubnav()  + whBody();
+    else if (S.tab==='acc') v.innerHTML = roBanner('الحسابات') + accSubnav() + accBody();
+    else                    v.innerHTML = ({dash:viewDash, branches:viewBranches})[S.tab]();
+  }
+  else if (S.mode==='branch') v.innerHTML = ({sell:viewSell,bstock:viewBStock,rets:viewRets,log:viewLog})[S.tab]();
+  else if (S.mode==='wh')     v.innerHTML = whBody();
+  else                        v.innerHTML = accBody();
+  wire(); bindChart();
+}
+
+/* ---------- الرسم البياني ---------- */
+function barChart(series, opts){
+  opts=opts||{}; const W=760,H=opts.h||210,padT=16,padB=26,padS=56;
+  const max=Math.max(...series.map(d=>d.total),1), nice=Math.ceil(max/50000)*50000||max;
+  const pw=W-padS-10, ph=H-padT-padB, bw=Math.max(3,pw/series.length-2);
+  const grid=[0,.5,1].map(f=>{ const y=padT+ph-ph*f;
+    return `<line x1="${padS}" y1="${y.toFixed(1)}" x2="${W-10}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+      <text x="${padS-8}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10.5" fill="var(--ink-3)">${KEGP(nice*f)}</text>`;}).join('');
+  const bars=series.map((d,i)=>{ const h=Math.max(1,(d.total/nice)*ph), x=padS+i*(pw/series.length)+1,
+    y=padT+ph-h, r=Math.min(4,bw/2,h);
+    return `<path d="M${x.toFixed(1)},${(y+h).toFixed(1)} L${x.toFixed(1)},${(y+r).toFixed(1)} Q${x.toFixed(1)},${y.toFixed(1)} ${(x+r).toFixed(1)},${y.toFixed(1)} L${(x+bw-r).toFixed(1)},${y.toFixed(1)} Q${(x+bw).toFixed(1)},${y.toFixed(1)} ${(x+bw).toFixed(1)},${(y+r).toFixed(1)} L${(x+bw).toFixed(1)},${(y+h).toFixed(1)} Z" fill="var(--accent)" class="bar" data-v="${d.total}" data-d="${dm(d.d)}"/>`;}).join('');
+  const step=Math.ceil(series.length/6);
+  const xl=series.map((d,i)=> i%step===0?`<text x="${(padS+i*(pw/series.length)+bw/2).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="10.5" fill="var(--ink-3)">${dm(d.d)}</text>`:'').join('');
+  return `<div class="chartbox"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label||'المبيعات اليومية')}">
+    ${grid}<line x1="${padS}" y1="${padT+ph}" x2="${W-10}" y2="${padT+ph}" stroke="var(--line-2)" stroke-width="1"/>
+    ${bars}${xl}</svg><div class="tip"></div></div>`;
+}
+function bindChart(){
+  const box=document.querySelector('.chartbox'); if(!box) return;
+  const tip=box.querySelector('.tip');
+  box.querySelectorAll('.bar').forEach(b=>{
+    b.addEventListener('mouseenter',()=>{ const r=b.getBoundingClientRect(), br=box.getBoundingClientRect();
+      tip.textContent=b.dataset.d+' · '+EGP(b.dataset.v);
+      tip.style.left=(r.left-br.left+r.width/2)+'px'; tip.style.top=(r.top-br.top)+'px'; tip.classList.add('on'); });
+    b.addEventListener('mouseleave',()=>tip.classList.remove('on'));
+  });
+}
+
+/* ============================================================
+   لوحة التحكم
+   ============================================================ */
+function viewDash(){
+  const all=dailyAll(), last30=all.slice(-30);
+  const month=last30.reduce((a,d)=>a+d.total,0), prev=all.slice(-60,-30).reduce((a,d)=>a+d.total,0);
+  const delta=Math.round((month-prev)/prev*100);
+  const low=COMBOS.filter(c=>c.q<=LOW_B);
+  const top=BRANCHES.slice().sort((a,b)=>monthSales(b.id)-monthSales(a.id)).slice(0,6);
+  const maxTop=monthSales(top[0].id), P=pnl();
+  return `
+  <div class="tiles">
+    <div class="tile"><span class="lbl">مبيعات اليوم — كل الفروع</span><span class="val">${EGP(all[all.length-1].total)}</span><span class="meta">${AR(15)} فرع</span></div>
+    <div class="tile"><span class="lbl">مبيعات آخر ٣٠ يوم</span><span class="val">${EGP(month)}</span><span class="meta">${delta>=0?'▲':'▼'} ${AR(Math.abs(delta))}٪ عن الشهر السابق</span></div>
+    <div class="tile"><span class="lbl">قيمة المخزون</span><span class="val">${EGP(BRANCHES.reduce((a,b)=>a+stockValue(b.id),0))}</span><span class="meta">بالتكلفة</span></div>
+    <div class="tile"><span class="lbl">صافي الربح</span><span class="val">${EGP(P.net)}</span><span class="meta">هامش ${AR(Math.round(P.net/P.netRev*100))}٪ · من الدفاتر</span></div>
+  </div>
+  <div class="card card-pad stack" style="gap:14px">
+    <div class="sechead"><h2>المبيعات اليومية — كل الفروع</h2><span class="sub">آخر ٣٠ يوماً · بالجنيه المصري</span></div>
+    ${barChart(last30,{label:'المبيعات اليومية لكل الفروع خلال آخر ثلاثين يوماً'})}
+  </div>
+  <div class="row" style="align-items:stretch; gap:18px">
+    <div class="card card-pad stack-s" style="flex:1 1 380px; min-width:0">
+      <h2 style="font-size:17px">أعلى الفروع هذا الشهر</h2>
+      ${top.map(b=>`<div class="stack-s" style="gap:5px">
+        <div class="row" style="justify-content:space-between; gap:8px"><span style="font-weight:500">${esc(b.name)}</span><span class="n sub">${EGP(monthSales(b.id))}</span></div>
+        <div class="minibar"><i style="width:${(monthSales(b.id)/maxTop*100).toFixed(1)}%"></i></div></div>`).join('')}
+    </div>
+    <div class="card card-pad stack-s" style="flex:1 1 320px; min-width:0">
+      <h2 style="font-size:17px">تنبيهات المخزون</h2>
+      <p class="sub">${AR(low.length)} صنف وصل للحد الأدنى في فروع مختلفة.</p>
+      ${low.slice(0,6).map(x=>`<div class="row" style="justify-content:space-between; gap:8px; font-size:13.5px">
+        <span>${esc(x.s.name)} <span class="sub">— ${esc(x.b.name)}</span></span>
+        <span class="badge ${x.q<=Math.round(LOW_B*0.35)?'b-loud':'b-mark'}">${AR(x.q)} قطعة</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   الفروع — قائمة + حركات كل الفروع بفلاتر
+   ============================================================ */
+function filtered(){
+  const F=S.F, from=new Date(F.from+'T00:00:00'), to=new Date(F.to+'T23:59:59');
+  const q=F.q.trim();
+  return MOVES.filter(m=>
+    m.at>=from && m.at<=to &&
+    (F.branch==='all' || m.bid===+F.branch) &&
+    F.types[m.kind] &&
+    (!q || m.name.includes(q) || m.id.includes(q) || m.code.includes(q) || brName(m.bid).includes(q))
+  );
+}
+function viewBranches(){
+  return `<div class="subnav" role="group">
+      <button data-bv="list" aria-pressed="${S.bview==='list'}">قائمة الفروع</button>
+      <button data-bv="moves" aria-pressed="${S.bview==='moves'}">حركات كل الفروع</button>
+    </div>` + (S.bview==='list' ? branchList() : movesPanel());
+}
+function branchList(){
+  const maxM=Math.max(...BRANCHES.map(b=>monthSales(b.id)));
+  return `<div class="sechead"><h2>الفروع</h2><span class="sub">اضغط على أي فرع لفتح ملفه الكامل</span></div>
+  <div class="tscroll"><table>
+    <thead><tr><th>الفرع</th><th>المحافظة</th><th>المسؤولة</th><th>مبيعات اليوم</th><th>مبيعات الشهر</th><th></th><th>قيمة المخزون</th><th>الحالة</th></tr></thead>
+    <tbody>${BRANCHES.map(b=>`<tr class="clickable" data-b="${b.id}">
+      <td style="font-weight:700">${esc(b.name)}</td><td class="sub">${esc(b.city)}</td><td>${esc(b.manager)}</td>
+      <td class="n">${EGP(todaySales(b.id))}</td><td class="n">${EGP(monthSales(b.id))}</td>
+      <td style="width:120px"><div class="minibar"><i style="width:${(monthSales(b.id)/maxM*100).toFixed(1)}%"></i></div></td>
+      <td class="n">${EGP(stockValue(b.id))}</td><td><span class="badge b-quiet">يعمل</span></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function movesPanel(){
+  const F=S.F, rows=filtered(), shown=rows.slice(0,150);
+  const sum = k => rows.filter(m=>m.kind===k).reduce((a,m)=>a+m.value,0);
+  const cnt = k => rows.filter(m=>m.kind===k).length;
+  return `
+  <div class="filters">
+    <div class="f"><label for="f-from">من تاريخ</label><input class="fld" type="date" id="f-from" value="${F.from}"></div>
+    <div class="f"><label for="f-to">إلى تاريخ</label><input class="fld" type="date" id="f-to" value="${F.to}"></div>
+    <div class="f"><label for="f-branch">الفرع</label>
+      <select class="fld" id="f-branch"><option value="all">كل الفروع</option>
+        ${BRANCHES.map(b=>`<option value="${b.id}" ${F.branch==String(b.id)?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>
+    <div class="f" style="flex:1 1 200px"><label for="f-q">بحث</label>
+      <input class="fld" id="f-q" placeholder="رقم الحركة أو الصنف أو الفرع..." value="${esc(F.q)}" style="width:100%"></div>
+    <div class="f" style="flex:1 1 100%"><label>نوع الحركة</label>
+      <div class="chips">${Object.entries(MTYPES).map(([k,v])=>
+        `<button data-ty="${k}" aria-pressed="${!!F.types[k]}">${v.label}</button>`).join('')}
+        <button data-ty="__all">الكل</button><button data-ty="__none">بلا</button></div></div>
+    <div class="f"><label>&nbsp;</label><button class="btn btn-sm" id="f-reset">مسح الفلاتر</button></div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">حركات مطابقة</span><span class="val">${AR(rows.length)}</span><span class="meta">من ${AR(MOVES.length)} حركة</span></div>
+    <div class="tile"><span class="lbl">مبيعات</span><span class="val">${EGP(sum('sale'))}</span><span class="meta">${AR(cnt('sale'))} فاتورة</span></div>
+    <div class="tile"><span class="lbl">مرتجعات</span><span class="val">${EGP(sum('return'))}</span><span class="meta">${AR(cnt('return'))} حركة</span></div>
+    <div class="tile"><span class="lbl">توريد</span><span class="val">${EGP(sum('receipt'))}</span><span class="meta">${AR(cnt('receipt'))} إذن</span></div>
+    <div class="tile"><span class="lbl">تحويلات وجرد</span><span class="val">${AR(cnt('transfer')+cnt('count'))}</span><span class="meta">${AR(cnt('transfer'))} تحويل · ${AR(cnt('count'))} جرد</span></div>
+  </div>
+  <div class="sechead"><h2>حركات كل الفروع</h2><span class="sub">يُعرض ${AR(shown.length)} من ${AR(rows.length)}</span></div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>رقم الحركة</th><th>التاريخ</th><th>الفرع</th><th>النوع</th><th>الصنف</th><th>المقاس واللون</th><th>العدد</th><th>القيمة</th><th>تفاصيل</th></tr></thead>
+    <tbody>${ shown.length ? shown.map(m=>`<tr>
+      <td class="code">${m.id}</td><td class="sub">${dmy(m.at)}</td><td>${esc(brName(m.bid))}</td>
+      <td><span class="badge ${m.kind==='sale'?'b-quiet':m.kind==='return'?'b-loud':'b-mark'}">${MTYPES[m.kind].label}</span></td>
+      <td>${esc(m.name)}</td><td class="sub">${m.size} · ${esc(m.color)}</td>
+      <td class="n">${AR(m.qty)}</td><td class="n">${EGP(m.value)}</td>
+      <td class="sub">${ m.kind==='transfer' ? 'إلى '+esc(brName(m.to)) : m.kind==='receipt' ? esc(m.supplier)
+        : m.kind==='count' ? esc(m.reason) : esc(m.pay||'—') }</td></tr>`).join('')
+      : '<tr><td colspan="9" class="empty">لا توجد حركات مطابقة للفلاتر.</td></tr>' }
+    </tbody></table></div>`;
+}
+
+function viewProfile(bid){
+  const b=BRANCHES.find(x=>x.id===bid), d30=DAILY[bid].slice(-30);
+  const mv=movesOf(bid), sales=mv.filter(m=>m.kind==='sale'), rets=mv.filter(m=>m.kind==='return');
+  const avg=Math.round(sales.reduce((a,t)=>a+t.value,0)/Math.max(sales.length,1));
+  return `<button class="backlink" id="back">↩ العودة إلى قائمة الفروع</button>
+  <div class="sechead"><div><h2 style="font-size:23px">فرع ${esc(b.name)}</h2>
+    <span class="sub">${esc(b.city)} · المسؤولة ${esc(b.manager)}</span></div><span class="badge b-quiet">يعمل</span></div>
+  <div class="notice"><span>🗂️</span><div>صفحة الفرع داخل الإدارة الرئيسية، وتحتوي على <b>كامل تاريخ الفرع</b> منذ افتتاحه. شاشة الفرع نفسها لا تعرض سوى آخر ٣٠ يوماً.</div></div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">مبيعات الشهر</span><span class="val">${EGP(monthSales(bid))}</span><span class="meta">٣٠ يوم</span></div>
+    <div class="tile"><span class="lbl">عدد الفواتير</span><span class="val">${AR(sales.length)}</span><span class="meta">٩٠ يوم</span></div>
+    <div class="tile"><span class="lbl">متوسط الفاتورة</span><span class="val">${EGP(avg)}</span><span class="meta">—</span></div>
+    <div class="tile"><span class="lbl">المرتجعات</span><span class="val">${AR(rets.length)}</span><span class="meta">${EGP(rets.reduce((a,t)=>a+t.value,0))}</span></div>
+    <div class="tile"><span class="lbl">قيمة المخزون</span><span class="val">${EGP(stockValue(bid))}</span><span class="meta">${AR(STYLES.reduce((a,s)=>a+branchQty(bid,s.code),0))} قطعة</span></div>
+  </div>
+  <div class="card card-pad stack" style="gap:14px">
+    <div class="sechead"><h2>مبيعات الفرع اليومية</h2><span class="sub">آخر ٣٠ يوماً</span></div>
+    ${barChart(d30,{label:'المبيعات اليومية لفرع '+b.name})}</div>
+  <div class="sechead"><h2>آخر الحركات</h2><span class="sub">يُعرض ${AR(14)} من ${AR(mv.length)}</span></div>
+  <div class="tscroll"><table><thead><tr><th>رقم</th><th>التاريخ</th><th>النوع</th><th>الصنف</th><th>المقاس واللون</th><th>العدد</th><th>القيمة</th></tr></thead>
+    <tbody>${mv.slice(0,14).map(m=>`<tr><td class="code">${m.id}</td><td class="sub">${dmy(m.at)}</td>
+      <td><span class="badge ${m.kind==='sale'?'b-quiet':m.kind==='return'?'b-loud':'b-mark'}">${MTYPES[m.kind].label}</span></td>
+      <td>${esc(m.name)}</td><td class="sub">${m.size} · ${esc(m.color)}</td>
+      <td class="n">${AR(m.qty)}</td><td class="n">${EGP(m.value)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ============================================================
+   شاشة المخزن
+   ============================================================ */
+/* ---------- شاشة المخزن: الأصناف ---------- */
+function whItems(){
+  const q=S.q.trim(), list=STYLES.filter(s=>!q||s.name.includes(q)||s.code.includes(q)||s.cat.includes(q));
+  const variants=STYLES.reduce((a,s)=>a+s.colors.length*s.sizes.length,0);
+  const under=STYLES.filter(s=>totalQty(s.code) <= s.reorder*15).length;
+  return `
+  <div class="tiles">
+    <div class="tile"><span class="lbl">عدد الأصناف</span><span class="val">${AR(STYLES.length)}</span><span class="meta">${AR(CATS.length)} تصنيف</span></div>
+    <div class="tile"><span class="lbl">المتغيّرات</span><span class="val">${AR(variants)}</span><span class="meta">مقاس × لون · لكلٍّ باركود</span></div>
+    <div class="tile"><span class="lbl">رصيد المخزن الرئيسي</span><span class="val">${AR(whTotal())}</span><span class="meta">قبل التوزيع</span></div>
+    <div class="tile"><span class="lbl">رصيد الفروع</span><span class="val">${AR(STYLES.reduce((a,s)=>a+totalQty(s.code),0))}</span><span class="meta">في ${AR(15)} فرع</span></div>
+    <div class="tile"><span class="lbl">قيمة المخزون</span><span class="val">${EGP(stockValue(WH_ID)+BRANCHES.reduce((a,b)=>a+stockValue(b.id),0))}</span><span class="meta">بالتكلفة</span></div>
+    <div class="tile"><span class="lbl">تحت حد الطلب</span><span class="val">${AR(under)}</span><span class="meta">يحتاج توريد</span></div>
+  </div>
+  <div class="sechead"><h2>الأصناف</h2>
+    ${ RO() ? '<span class="badge b-mark">عرض فقط</span>'
+      : '<button class="btn btn-primary btn-sm" id="w-new">+ صنف جديد</button>' }</div>
+  ${ RO() ? '' : '<div class="notice"><span>🏷️</span><div>كل صنف يُعرَّف مرة واحدة هنا، فيولّد النظام <b>متغيّراً لكل مقاس ولون</b> بكود وباركود مستقلّين. الفروع تستقبل الأصناف ولا تنشئها ولا تغيّر أسعارها.</div></div>' }
+  <div class="row" style="justify-content:space-between">
+    <input class="srch" id="sq" placeholder="ابحث بالاسم أو الكود أو التصنيف..." value="${esc(S.q)}" style="flex:1; max-width:340px">
+    <span class="sub">${AR(list.length)} صنف</span></div>
+  <div class="tscroll"><table>
+    <thead><tr><th>الكود</th><th>الصنف</th><th>التصنيف</th><th>الموسم</th><th>الألوان</th><th>المقاسات</th><th>التكلفة</th><th>البيع</th><th>الهامش</th><th>المخزن الرئيسي</th><th>بالفروع</th><th>حد الطلب</th><th>الحالة</th></tr></thead>
+    <tbody>${list.map(s=>{ const q2=totalQty(s.code), lim=s.reorder*15;
+      const st = q2===0?['b-loud','نفد'] : q2<=lim?['b-mark','تحت الحد'] : ['b-quiet','متاح'];
+      return `<tr class="clickable" data-s="${s.code}">
+        <td class="code">${s.code}</td><td style="font-weight:700">${esc(s.name)}</td>
+        <td class="sub">${esc(s.cat)}</td><td class="sub">${esc(s.season)}</td>
+        <td class="sub">${AR(s.colors.length)}</td><td class="sub">${AR(s.sizes.length)}</td>
+        <td class="n sub">${EGP(s.cost)}</td><td class="n">${EGP(s.price)}</td>
+        <td class="n">${AR(Math.round((s.price-s.cost)/s.price*100))}٪</td>
+        <td class="n">${AR(branchQty(WH_ID,s.code))}</td><td class="n">${AR(q2)}</td>
+        <td class="n sub">${AR(lim)}</td><td><span class="badge ${st[0]}">${st[1]}</span></td></tr>`;}).join('')}
+    </tbody></table></div>`;
+}
+
+/* ---------- جدول حركات المخزن حسب النوع ---------- */
+function whMoveTable(kind, cols){
+  const rows = MOVES.filter(m=>m.kind===kind).slice(0,120);
+  return `<div class="tscroll tall"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+    <tbody>${ rows.length ? rows.map(m=>`<tr>
+      <td class="code">${m.id}</td><td class="sub">${dmy(m.at)}</td>
+      <td>${esc(m.name)}</td><td class="sub">${m.size} · ${esc(m.color)}</td>
+      <td class="n">${AR(m.qty)}</td>
+      <td>${ kind==='receipt' ? esc(m.supplier||'—') : kind==='transfer' ? esc(locName(m.from!=null?m.from:m.bid))
+            : esc(locName(m.bid)) }</td>
+      <td>${ kind==='transfer' ? esc(locName(m.to)) : kind==='count' ? esc(m.reason||'—') : esc(locName(m.bid)) }</td>
+      <td class="n">${EGP(m.value)}</td></tr>`).join('')
+      : `<tr><td colspan="${cols.length}" class="empty">لا توجد حركات.</td></tr>` }
+    </tbody></table></div>`;
+}
+function whGRN(){
+  const rows=MOVES.filter(m=>m.kind==='receipt');
+  return `<div class="sechead"><div><h2>إذون التوريد</h2><span class="sub">${AR(rows.length)} إذن · استلام من الموردين</span></div>
+    ${ RO()?'<span class="badge b-mark">عرض فقط</span>':'<button class="btn btn-primary btn-sm" data-wf="grn">+ إذن توريد</button>' }</div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">عدد الإذون</span><span class="val">${AR(rows.length)}</span><span class="meta">٩٠ يوم</span></div>
+    <div class="tile"><span class="lbl">القيمة الموردة</span><span class="val">${EGP(rows.reduce((a,m)=>a+m.value,0))}</span><span class="meta">بالتكلفة</span></div>
+    <div class="tile"><span class="lbl">عدد القطع</span><span class="val">${AR(rows.reduce((a,m)=>a+m.qty,0))}</span><span class="meta">—</span></div>
+    <div class="tile"><span class="lbl">الموردون</span><span class="val">${AR(SUPPLIERS.length)}</span><span class="meta">نشطون</span></div>
+  </div>
+  ${whMoveTable('receipt',['رقم الإذن','التاريخ','الصنف','المقاس واللون','العدد','المورّد','الوجهة','القيمة'])}`;
+}
+function whTRF(){
+  const rows=MOVES.filter(m=>m.kind==='transfer');
+  return `<div class="sechead"><div><h2>التحويلات</h2><span class="sub">${AR(rows.length)} تحويل بين المواقع</span></div>
+    ${ RO()?'<span class="badge b-mark">عرض فقط</span>':'<button class="btn btn-primary btn-sm" data-wf="trf">+ تحويل جديد</button>' }</div>
+  <div class="notice"><span>🔁</span><div>التحويل يخصم من الموقع المُرسِل ويضيف للموقع المستقبِل في حركة واحدة، ويظهر فوراً في <b>سجل حركات الفروع</b>.</div></div>
+  ${whMoveTable('transfer',['رقم التحويل','التاريخ','الصنف','المقاس واللون','العدد','من','إلى','القيمة'])}`;
+}
+function whADJ(){
+  const rows=MOVES.filter(m=>m.kind==='count');
+  return `<div class="sechead"><div><h2>الجرد والتسويات</h2><span class="sub">${AR(rows.length)} تسوية</span></div>
+    ${ RO()?'<span class="badge b-mark">عرض فقط</span>':'<button class="btn btn-primary btn-sm" data-wf="adj">+ جرد جديد</button>' }</div>
+  <div class="notice"><span>📋</span><div>الجرد يقارن <b>الرصيد الدفتري</b> بالكمية المعدودة فعلياً، ويُرحّل الفروق فقط. لا يستطيع الفرع تعديل رصيده إلا من خلال جرد مُرحَّل.</div></div>
+  ${whMoveTable('count',['رقم التسوية','التاريخ','الصنف','المقاس واللون','الفرق','الموقع','السبب','القيمة'])}`;
+}
+
+/* ---------- نماذج المخزن ---------- */
+function wfInit(kind){
+  const s0=STYLES[0];
+  S.WF={ kind, to:WH_ID, from:WH_ID, loc:WH_ID, code:s0.code, size:s0.sizes[0], color:s0.colors[0],
+         qty:'', supplier:SUPPLIERS[0], counted:{} };
+}
+function locSel(id,label,val){
+  return `<div class="f-full"><label for="${id}">${label}</label><select id="${id}">${
+    LOCS().map(([v,n])=>`<option value="${v}" ${+val===v?'selected':''}>${esc(n)}</option>`).join('')}</select></div>`;
+}
+function itemSel(){ const W=S.WF;
+  return `<div class="f-full"><label for="w-code">الصنف</label><select id="w-code">${
+    STYLES.map(x=>`<option value="${x.code}" ${x.code===W.code?'selected':''}>${esc(x.name)} — ${x.code}</option>`).join('')}</select></div>`;
+}
+function variantSel(){ const W=S.WF, s=styleBy(W.code);
+  return `<div class="f-full"><label for="w-size">المقاس</label><select id="w-size">${
+      s.sizes.map(z=>`<option ${z===W.size?'selected':''}>${z}</option>`).join('')}</select></div>
+    <div class="f-full"><label for="w-color">اللون</label><select id="w-color">${
+      s.colors.map(c=>`<option ${c===W.color?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="f-full"><label for="w-qty">الكمية</label><input id="w-qty" type="number" min="1" value="${W.qty}" placeholder="٠"></div>`;
+}
+function grnForm(){
+  const W=S.WF, s=styleBy(W.code), cur=qtyAt(W.to,W.code,W.size,W.color), n=+W.qty||0;
+  return `<div class="fieldset"><h4>بيانات الإذن</h4>
+    <div class="grid2">
+      <div class="f-full"><label for="w-sup">المورّد</label><select id="w-sup">${
+        SUPPLIERS.map(x=>`<option ${x===W.supplier?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+      ${locSel('w-to','الوجهة',W.to)}${itemSel()}${variantSel()}
+    </div>
+    <p class="hint">الرصيد في ${esc(locName(W.to))}: <b>${AR(cur)}</b> → بعد التوريد <b>${AR(cur+n)}</b> · قيمة الإذن <b>${EGP(n*s.cost)}</b> بالتكلفة</p>
+  </div>
+  <div class="row" style="justify-content:flex-end"><button class="btn" id="w-cancel">إلغاء</button>
+    <button class="btn btn-primary" id="w-save" ${n>0?'':'disabled'}>ترحيل إذن التوريد</button></div>`;
+}
+function trfForm(){
+  const W=S.WF, s=styleBy(W.code), avail=qtyAt(W.from,W.code,W.size,W.color), n=+W.qty||0;
+  const ok = n>0 && n<=avail && +W.from!==+W.to;
+  return `<div class="fieldset"><h4>بيانات التحويل</h4>
+    <div class="grid2">${locSel('w-from','من',W.from)}${locSel('w-to','إلى',W.to)}${itemSel()}${variantSel()}</div>
+    <p class="hint">المتاح في ${esc(locName(W.from))}: <b>${AR(avail)}</b> قطعة${
+      +W.from===+W.to ? ' · <b>لا يمكن التحويل إلى الموقع نفسه</b>' : n>avail ? ' · <b>الكمية المطلوبة أكبر من المتاح</b>' : '' }</p>
+  </div>
+  <div class="row" style="justify-content:flex-end"><button class="btn" id="w-cancel">إلغاء</button>
+    <button class="btn btn-primary" id="w-save" ${ok?'':'disabled'}>ترحيل التحويل</button></div>`;
+}
+function adjForm(){
+  const W=S.WF, s=styleBy(W.code);
+  const rows = s.colors.flatMap(cl=> s.sizes.map(sz=>{ const k=vkey(sz,cl);
+    const c=W.counted[k]; const has = c!==undefined && c!=='';
+    return { sz, cl, k, book:qtyAt(W.loc,W.code,sz,cl), cnt:has?+c:null, raw:has?c:'' }; }));
+  const diffs = rows.filter(r=>r.cnt!==null && r.cnt!==r.book);
+  return `<div class="fieldset"><h4>موقع الجرد</h4>
+    <div class="grid2">${locSel('w-loc','الموقع',W.loc)}${itemSel()}</div></div>
+  <div class="fieldset"><h4>الجرد الفعلي</h4>
+    <div class="tscroll"><table><thead><tr><th>المتغيّر</th><th>الكود</th><th>الدفتري</th><th>المعدود</th><th>الفرق</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td>${r.sz} · ${esc(r.cl)}</td><td class="code">${sku(s,r.sz,r.cl)}</td>
+      <td class="n">${AR(r.book)}</td>
+      <td><input class="fld" style="width:92px" type="number" min="0" data-cnt="${r.k}" value="${r.raw}" placeholder="—"></td>
+      <td class="n" style="font-weight:700">${ r.cnt===null?'—' : (r.cnt-r.book>0?'+':'')+AR(r.cnt-r.book) }</td></tr>`).join('')}
+    </tbody></table></div>
+    <p class="hint">${ diffs.length ? '<b>'+AR(diffs.length)+'</b> متغيّر به فرق سيُرحَّل كتسوية جرد.' : 'أدخل الكميات المعدودة لإظهار الفروق.' }</p>
+  </div>
+  <div class="row" style="justify-content:flex-end"><button class="btn" id="w-cancel">إلغاء</button>
+    <button class="btn btn-primary" id="w-save" ${diffs.length?'':'disabled'}>ترحيل ${AR(diffs.length)} فرق</button></div>`;
+}
+const WF_META = { grn:['إذن توريد جديد',grnForm], trf:['تحويل جديد',trfForm], adj:['جرد وتسوية',adjForm] };
+function openWF(kind){ wfInit(kind); openModal(WF_META[kind][0], WF_META[kind][1]()); wireWF(); }
+function wireWF(){
+  const W=S.WF; if(!W) return;
+  const re=(sel,caret)=>{ $('#modal-body').innerHTML=WF_META[W.kind][1](); wireWF();
+    if(!sel) return; let el=null; try{ el=document.querySelector(sel); }catch(e){}
+    if(el){ el.focus(); if(caret!=null&&el.setSelectionRange){ try{el.setSelectionRange(caret,caret);}catch(e){} } } };
+  const bind=(id,key,isNum)=>{ const el=$('#'+id); if(!el) return;
+    el.onchange=e=>{ W[key]= isNum? e.target.value : e.target.value; re(); }; };
+  bind('w-sup','supplier'); bind('w-to','to'); bind('w-from','from'); bind('w-loc','loc');
+  bind('w-size','size'); bind('w-color','color');
+  const cd=$('#w-code'); if(cd) cd.onchange=e=>{ W.code=e.target.value; const s=styleBy(W.code);
+    if(!s.sizes.includes(W.size)) W.size=s.sizes[0];
+    if(!s.colors.includes(W.color)) W.color=s.colors[0];
+    W.counted={}; re(); };
+  const qn=$('#w-qty'); if(qn) qn.oninput=e=>{ W.qty=e.target.value; re('#w-qty', e.target.selectionStart); };
+  document.querySelectorAll('[data-cnt]').forEach(el=> el.oninput=e=>{
+    W.counted[el.dataset.cnt]=e.target.value; re('[data-cnt="'+el.dataset.cnt+'"]', e.target.selectionStart); });
+  const c=$('#w-cancel'); if(c) c.onclick=()=>{ S.WF=null; $('#layer').innerHTML=''; };
+  const sv=$('#w-save'); if(sv) sv.onclick=()=>{
+    const s=styleBy(W.code), n=+W.qty||0, now=new Date();
+    const add=(loc,code,sz,cl,d)=>{ const m=STOCK[+loc][code]; m[vkey(sz,cl)]=Math.max(0,(m[vkey(sz,cl)]||0)+d); };
+    if (W.kind==='grn'){
+      add(W.to,W.code,W.size,W.color,n);
+      MOVES.unshift({ id:'GRN-'+String(+W.to).padStart(2,'0')+'-'+(++mSeq), at:now, bid:+W.to, kind:'receipt',
+        code:s.code, name:s.name, size:W.size, color:W.color, qty:n, value:n*s.cost,
+        supplier:W.supplier, by:'أمين المخزن' });
+      toast('تم ترحيل إذن التوريد · '+AR(n)+' قطعة إلى '+locName(W.to));
+    } else if (W.kind==='trf'){
+      add(W.from,W.code,W.size,W.color,-n); add(W.to,W.code,W.size,W.color,n);
+      MOVES.unshift({ id:'TRF-'+String(+W.from).padStart(2,'0')+'-'+(++mSeq), at:now, bid:+W.from, kind:'transfer',
+        code:s.code, name:s.name, size:W.size, color:W.color, qty:n, value:n*s.cost,
+        from:+W.from, to:+W.to, by:'أمين المخزن' });
+      toast('تم التحويل · '+AR(n)+' قطعة من '+locName(W.from)+' إلى '+locName(W.to));
+    } else {
+      let k=0;
+      Object.entries(W.counted).forEach(([key,v])=>{ if(v==='') return;
+        const [sz,cl]=key.split('|'); const book=qtyAt(W.loc,W.code,sz,cl), cnt=+v;
+        if(cnt===book) return;
+        STOCK[+W.loc][W.code][key]=cnt; k++;
+        MOVES.unshift({ id:'ADJ-'+String(+W.loc).padStart(2,'0')+'-'+(++mSeq), at:now, bid:+W.loc, kind:'count',
+          code:s.code, name:s.name, size:sz, color:cl, qty:Math.abs(cnt-book),
+          value:Math.abs(cnt-book)*s.cost, reason: cnt>book?'زيادة جرد':'عجز جرد', by:'أمين المخزن' });
+      });
+      toast('تم ترحيل '+AR(k)+' فرق جرد');
+    }
+    S.WF=null; $('#layer').innerHTML=''; render();
+  };
+}
+
+/* نموذج صنف جديد — يولّد المتغيّرات والأكواد والباركود مباشرةً */
+function newItemForm(){
+  S.NI = S.NI || { name:'', cat:CATS[0], season:SEASONS[0], cost:'', price:'', reorder:50,
+                   supplier:SUPPLIERS[0], colors:['أسود'], sizes:['S','M','L'] };
+  const N=S.NI;
+  const nVar = N.colors.length*N.sizes.length;
+  const margin = (N.cost>0 && N.price>0) ? Math.round((N.price-N.cost)/N.price*100) : null;
+  const nextCode = 'MRS-'+(styleSeq+1);
+  const preview = N.colors.flatMap(cl=> N.sizes.map(sz=>({sz,cl}))).slice(0,8);
+  const ok = N.name.trim() && +N.cost>0 && +N.price>0 && nVar>0 && +N.price>+N.cost;
+  return `
+  <div class="fieldset">
+    <h4>بيانات الصنف</h4>
+    <div class="grid2">
+      <div class="f-full"><label for="n-name">اسم الصنف</label>
+        <input id="n-name" value="${esc(N.name)}" placeholder="مثال: فستان كتان ميدي"></div>
+      <div class="f-full"><label for="n-cat">التصنيف</label>
+        <select id="n-cat">${CATS.map(c=>`<option ${c===N.cat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="f-full"><label for="n-season">الموسم</label>
+        <select id="n-season">${SEASONS.map(c=>`<option ${c===N.season?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="f-full"><label for="n-sup">المورّد</label>
+        <select id="n-sup">${SUPPLIERS.map(c=>`<option ${c===N.supplier?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    </div>
+  </div>
+  <div class="fieldset">
+    <h4>المقاسات والألوان</h4>
+    <div class="f-full"><label>المقاسات</label>
+      <div class="chips">${['S','M','L','XL','XXL'].map(z=>`<button data-nsz="${z}" aria-pressed="${N.sizes.includes(z)}">${z}</button>`).join('')}</div></div>
+    <div class="f-full"><label>الألوان</label>
+      <div class="chips">${PALETTE.map(c=>`<button data-ncl="${esc(c)}" aria-pressed="${N.colors.includes(c)}">${esc(c)}</button>`).join('')}</div></div>
+    <p class="hint">سيُنشئ النظام <b>${AR(nVar)}</b> متغيّراً (${AR(N.sizes.length)} مقاس × ${AR(N.colors.length)} لون)، لكلٍّ كود وباركود مستقل.</p>
+  </div>
+  <div class="fieldset">
+    <h4>التسعير</h4>
+    <div class="grid2">
+      <div class="f-full"><label for="n-cost">سعر التكلفة</label><input id="n-cost" type="number" min="0" value="${N.cost}" placeholder="٠"></div>
+      <div class="f-full"><label for="n-price">سعر البيع</label><input id="n-price" type="number" min="0" value="${N.price}" placeholder="٠"></div>
+      <div class="f-full"><label for="n-re">حد إعادة الطلب للفرع</label><input id="n-re" type="number" min="0" value="${N.reorder}"></div>
+      <div class="f-full"><label>هامش الربح</label>
+        <div style="padding:9px 12px; border:1px dashed var(--line-2); border-radius:8px; font-weight:700" class="n">
+          ${ margin===null ? '—' : (margin<=0 ? 'سعر البيع يجب أن يتجاوز التكلفة' : AR(margin)+'٪ · '+EGP(N.price-N.cost)) }</div></div>
+    </div>
+  </div>
+  <div class="fieldset">
+    <h4>معاينة الأكواد</h4>
+    <p class="hint">الكود التالي في التسلسل: <span class="code">${nextCode}</span></p>
+    <div class="tscroll"><table><thead><tr><th>المتغيّر</th><th>الكود</th><th>الباركود</th><th>التكلفة</th><th>البيع</th></tr></thead>
+      <tbody>${ nVar ? preview.map(v=>{
+        const fake={code:nextCode};
+        return `<tr><td>${v.sz} · ${esc(v.cl)}</td>
+          <td class="code">${nextCode}-${SIZECODE[v.sz]||'5'}${colIdx(v.cl)}</td>
+          <td class="code">62${nextCode.slice(4)}${SIZECODE[v.sz]||'5'}${colIdx(v.cl)}${String((+nextCode.slice(4)*7)%10000).padStart(4,'0')}</td>
+          <td class="n sub">${N.cost?EGP(N.cost):'—'}</td><td class="n">${N.price?EGP(N.price):'—'}</td></tr>`;}).join('')
+        : '<tr><td colspan="5" class="empty">اختر مقاساً ولوناً على الأقل.</td></tr>' }
+        ${ nVar>8 ? `<tr><td colspan="5" class="sub">…و${AR(nVar-8)} متغيّراً آخر</td></tr>` : '' }
+      </tbody></table></div>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn" id="n-cancel">إلغاء</button>
+    <button class="btn btn-primary" id="n-save" ${ok?'':'disabled'}>حفظ الصنف وإنشاء ${AR(nVar)} متغيّر</button>
+  </div>`;
+}
+function openNewItem(){
+  openModal('صنف جديد', newItemForm(), true);
+  wireNewItem();
+}
+function wireNewItem(){
+  const N=S.NI; if(!N) return;
+  const re = (focusId, caret) => { $('#modal-body').innerHTML = newItemForm(); wireNewItem();
+    if(focusId){ const el=$('#'+focusId); if(el){ el.focus(); if(caret!=null && el.setSelectionRange){ try{el.setSelectionRange(caret,caret);}catch(e){} } } } };
+  const bindTxt = (id, key, num) => { const el=$('#'+id); if(!el) return;
+    el.oninput = e => { N[key] = num ? e.target.value : e.target.value; re(id, e.target.selectionStart); }; };
+  bindTxt('n-name','name'); bindTxt('n-cost','cost',1); bindTxt('n-price','price',1); bindTxt('n-re','reorder',1);
+  ['n-cat','n-season','n-sup'].forEach((id,i)=>{ const el=$('#'+id); if(el) el.onchange=e=>{
+    N[['cat','season','supplier'][i]]=e.target.value; re(); }; });
+  document.querySelectorAll('[data-nsz]').forEach(b=> b.onclick=()=>{ const z=b.dataset.nsz;
+    N.sizes.includes(z) ? N.sizes.splice(N.sizes.indexOf(z),1) : N.sizes.push(z);
+    N.sizes.sort((a,b)=>['S','M','L','XL','XXL'].indexOf(a)-['S','M','L','XL','XXL'].indexOf(b)); re(); });
+  document.querySelectorAll('[data-ncl]').forEach(b=> b.onclick=()=>{ const c=b.dataset.ncl;
+    N.colors.includes(c) ? N.colors.splice(N.colors.indexOf(c),1) : N.colors.push(c); re(); });
+  const cancel=$('#n-cancel'); if(cancel) cancel.onclick=()=>{ S.NI=null; $('#layer').innerHTML=''; };
+  const save=$('#n-save'); if(save) save.onclick=()=>{
+    const s = { code:'MRS-'+(++styleSeq), name:N.name.trim(), price:+N.price, cat:N.cat, cost:+N.cost,
+      colors:N.colors.slice(), sizes:N.sizes.slice(), season:N.season, reorder:+N.reorder||50,
+      supplier:N.supplier, depth:1 };
+    STYLES.push(s);
+    BRANCHES.forEach(b=>{ const m={}; s.colors.forEach(cl=> s.sizes.forEach(sz=>{ m[vkey(sz,cl)]=0; }));
+      STOCK[b.id][s.code]=m; });
+    const n = s.colors.length*s.sizes.length;
+    S.NI=null; $('#layer').innerHTML=''; render();
+    toast('تم حفظ «'+s.name+'» وإنشاء '+AR(n)+' متغيّر');
+  };
+}
+
+/* ============================================================
+   شاشة المحاسب
+   ============================================================ */
+const ACC_VIEWS = [['over','نظرة عامة'],['coa','دليل الحسابات'],['je','قيود اليومية'],
+                   ['tb','ميزان المراجعة'],['is','قائمة الدخل'],['bs','الميزانية العمومية'],['ap','الموردون']];
+function accOver(){
+  const P=pnl(), B=balanceSheet();
+  return `
+  <div class="notice"><span>⚙️</span><div>كل القيود تُنشأ <b>تلقائياً</b> من حركات البيع والتوريد والمصروفات في الفروع، والتقارير أدناه مُشتقّة من دفتر اليومية نفسه. ${ RO() ? 'الإدارة تطّلع على الدفاتر دون تعديلها.' : 'المحاسب يضيف القيود اليدوية والتسويات فقط.' }</div></div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">صافي المبيعات</span><span class="val">${EGP(P.netRev)}</span><span class="meta">بعد المردودات</span></div>
+    <div class="tile"><span class="lbl">مجمل الربح</span><span class="val">${EGP(P.gross)}</span><span class="meta">هامش ${AR(Math.round(P.gross/P.netRev*100))}٪</span></div>
+    <div class="tile"><span class="lbl">المصروفات التشغيلية</span><span class="val">${EGP(P.opex)}</span><span class="meta">${AR(P.ops.length)} بند</span></div>
+    <div class="tile"><span class="lbl">صافي الربح</span><span class="val">${EGP(P.net)}</span><span class="meta">هامش ${AR(Math.round(P.net/P.netRev*100))}٪</span></div>
+    <div class="tile"><span class="lbl">عدد القيود</span><span class="val">${AR(JOURNAL.length)}</span><span class="meta">${AR(jLines().length)} سطر</span></div>
+  </div>
+  <div class="row" style="align-items:stretch; gap:18px">
+    <div class="card card-pad stack-s" style="flex:1 1 340px; min-width:0">
+      <h2 style="font-size:17px">أرصدة سريعة</h2>
+      ${[['1110','النقدية بالخزينة'],['1120','البنك'],['1140','المخزون'],['2110','الموردون'],['2120','ضريبة القيمة المضافة']]
+        .map(([c,n])=>`<div class="row" style="justify-content:space-between; font-size:14px">
+          <span>${esc(n)} <span class="code">${arD(c)}</span></span>
+          <span class="n" style="font-weight:700">${EGP(Math.abs(accBal(c).bal))}</span></div>`).join('')}
+    </div>
+    <div class="card card-pad stack-s" style="flex:1 1 340px; min-width:0">
+      <h2 style="font-size:17px">توازن الميزانية</h2>
+      <div class="row" style="justify-content:space-between; font-size:14px"><span>إجمالي الأصول</span><span class="n" style="font-weight:700">${EGP(B.assets)}</span></div>
+      <div class="row" style="justify-content:space-between; font-size:14px"><span>الخصوم + حقوق الملكية</span><span class="n" style="font-weight:700">${EGP(B.total)}</span></div>
+      <div class="balrow ${Math.abs(B.assets-B.total)>1?'bad':''}"><span>الفرق</span><b>${EGP(Math.abs(B.assets-B.total))}</b></div>
+      <p class="sub">الفرق صفر لأن كل قيد في النظام متوازن بحكم التصميم — لا يمكن حفظ قيد غير متوازن.</p>
+    </div>
+  </div>`;
+}
+function accCOA(){
+  const groups=[...new Set(COA.map(a=>a.group))];
+  return `<div class="sechead"><h2>دليل الحسابات</h2><span class="sub">اضغط على أي حساب لفتح دفتر الأستاذ</span></div>
+  ${groups.map(g=>`<div class="stack-s">
+    <h3 style="font-size:15px; color:var(--ink-2)">${esc(g)}</h3>
+    <div class="tscroll"><table><thead><tr><th>الكود</th><th>اسم الحساب</th><th>الطبيعة</th><th>الرصيد</th></tr></thead>
+      <tbody>${COA.filter(a=>a.group===g).map(a=>{ const b=accBal(a.code);
+        return `<tr class="clickable" data-acc="${a.code}"><td class="code">${arD(a.code)}</td>
+          <td style="font-weight:500">${esc(a.name)}</td>
+          <td class="sub">${DEBIT_NATURE[a.type]>0?'مدين':'دائن'}</td>
+          <td class="n">${EGP(Math.abs(b.bal))}</td></tr>`;}).join('')}
+      </tbody></table></div></div>`).join('')}`;
+}
+function ledgerPanel(code){
+  const a=accBy(code); const rows=[];
+  let run=0;
+  JOURNAL.slice().sort((x,y)=>x.date-y.date).forEach(j=> j.lines.forEach(l=>{ if(l.acc!==code) return;
+    run += l.dr - l.cr; rows.push({j, dr:l.dr, cr:l.cr, run}); }));
+  return `<button class="backlink" id="back-acc">↩ العودة إلى دليل الحسابات</button>
+  <div class="sechead"><div><h2>${esc(a.name)} <span class="code">${arD(a.code)}</span></h2>
+    <span class="sub">${esc(a.group)} · طبيعة ${DEBIT_NATURE[a.type]>0?'مدينة':'دائنة'}</span></div>
+    <span class="badge b-mark">الرصيد ${EGP(Math.abs(run))}</span></div>
+  <div class="tscroll tall"><table><thead><tr><th>القيد</th><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td class="code">${r.j.id}</td><td class="sub">${dmy(r.j.date)}</td>
+      <td>${esc(r.j.desc)}</td><td class="n">${r.dr?EGP(r.dr):'—'}</td><td class="n">${r.cr?EGP(r.cr):'—'}</td>
+      <td class="n" style="font-weight:700">${EGP(Math.abs(r.run))}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function accJE(){
+  const list=JOURNAL.slice().sort((a,b)=>b.date-a.date);
+  return `<div class="sechead"><div><h2>قيود اليومية</h2><span class="sub">${AR(JOURNAL.length)} قيد · كلها متوازنة</span></div>
+    ${ RO() ? '<span class="badge b-mark">عرض فقط</span>' : '<button class="btn btn-primary btn-sm" id="je-new">+ قيد يدوي</button>' }</div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>المصدر</th><th>الحسابات</th><th>القيمة</th></tr></thead>
+    <tbody>${list.map(j=>{ const t=j.lines.reduce((a,l)=>a+l.dr,0);
+      return `<tr class="clickable" data-je="${j.id}"><td class="code">${j.id}</td><td class="sub">${dmy(j.date)}</td>
+        <td>${esc(j.desc)}</td><td><span class="badge ${j.src==='يدوي'?'b-mark':'b-quiet'}">${esc(j.src)}</span></td>
+        <td class="sub">${AR(j.lines.length)} سطر</td><td class="n">${EGP(t)}</td></tr>`;}).join('')}
+    </tbody></table></div>`;
+}
+function jeForm(){
+  S.JE = S.JE || { date: iso(new Date()), desc:'', lines:[{acc:'1110',dr:'',cr:''},{acc:'4110',dr:'',cr:''}] };
+  const J=S.JE;
+  const dr=J.lines.reduce((a,l)=>a+(+l.dr||0),0), cr=J.lines.reduce((a,l)=>a+(+l.cr||0),0);
+  const balanced = dr>0 && Math.abs(dr-cr)<0.5;
+  return `
+  <div class="grid2">
+    <div class="f-full"><label for="j-date">التاريخ</label><input id="j-date" type="date" value="${J.date}"></div>
+    <div class="f-full"><label for="j-desc">البيان</label><input id="j-desc" value="${esc(J.desc)}" placeholder="مثال: تسوية عجز خزينة فرع الزمالك"></div>
+  </div>
+  <div class="fieldset">
+    <h4>سطور القيد</h4>
+    <div class="jline" style="font-size:12px; color:var(--ink-3)"><span>الحساب</span><span>مدين</span><span>دائن</span><span></span></div>
+    ${J.lines.map((l,i)=>`<div class="jline">
+      <select data-jacc="${i}">${COA.map(a=>`<option value="${a.code}" ${a.code===l.acc?'selected':''}>${arD(a.code)} — ${esc(a.name)}</option>`).join('')}</select>
+      <input data-jdr="${i}" type="number" min="0" value="${l.dr}" placeholder="٠">
+      <input data-jcr="${i}" type="number" min="0" value="${l.cr}" placeholder="٠">
+      <button class="xbtn" data-jrm="${i}" aria-label="حذف السطر" ${J.lines.length<=2?'disabled style="opacity:.3"':''}>×</button>
+    </div>`).join('')}
+    <div class="row"><button class="btn btn-sm" id="j-add">+ إضافة سطر</button></div>
+    <div class="balrow ${balanced?'':'bad'}">
+      <span>إجمالي مدين <b class="n">${EGP(dr)}</b></span>
+      <span>إجمالي دائن <b class="n">${EGP(cr)}</b></span>
+      <span>الفرق <b class="n">${EGP(Math.abs(dr-cr))}</b></span>
+    </div>
+    <p class="hint">${ balanced ? 'القيد متوازن ويمكن حفظه.' : 'لا يمكن حفظ القيد حتى يتساوى المدين مع الدائن.' }</p>
+  </div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn" id="j-cancel">إلغاء</button>
+    <button class="btn btn-primary" id="j-save" ${balanced?'':'disabled'}>حفظ القيد</button>
+  </div>`;
+}
+function openJE(){ openModal('قيد يومية يدوي', jeForm(), true); wireJE(); }
+function wireJE(){
+  const J=S.JE; if(!J) return;
+  const re=(sel,caret)=>{ $('#modal-body').innerHTML=jeForm(); wireJE();
+    if(!sel) return;
+    let el=null; try{ el=document.querySelector(sel); }catch(e){ el=null; }
+    if(el){ el.focus(); if(caret!=null&&el.setSelectionRange){ try{el.setSelectionRange(caret,caret);}catch(e){} } } };
+  const d=$('#j-date'); if(d) d.onchange=e=>{ J.date=e.target.value; re(); };
+  const ds=$('#j-desc'); if(ds) ds.oninput=e=>{ J.desc=e.target.value; re('#j-desc', e.target.selectionStart); };
+  document.querySelectorAll('[data-jacc]').forEach(el=> el.onchange=e=>{ J.lines[+el.dataset.jacc].acc=e.target.value; re(); });
+  document.querySelectorAll('[data-jdr]').forEach(el=> el.oninput=e=>{ const i=+el.dataset.jdr;
+    J.lines[i].dr=e.target.value; if(e.target.value) J.lines[i].cr=''; re('[data-jdr="'+i+'"]'); });
+  document.querySelectorAll('[data-jcr]').forEach(el=> el.oninput=e=>{ const i=+el.dataset.jcr;
+    J.lines[i].cr=e.target.value; if(e.target.value) J.lines[i].dr=''; re('[data-jcr="'+i+'"]'); });
+  document.querySelectorAll('[data-jrm]').forEach(el=> el.onclick=()=>{ if(J.lines.length<=2) return;
+    J.lines.splice(+el.dataset.jrm,1); re(); });
+  const add=$('#j-add'); if(add) add.onclick=()=>{ J.lines.push({acc:'1110',dr:'',cr:''}); re(); };
+  const c=$('#j-cancel'); if(c) c.onclick=()=>{ S.JE=null; $('#layer').innerHTML=''; };
+  const sv=$('#j-save'); if(sv) sv.onclick=()=>{
+    JOURNAL.push({ id:'JV-'+String(++jSeq).padStart(4,'0'), date:new Date(J.date+'T12:00:00'),
+      desc: J.desc.trim()||'قيد يدوي', src:'يدوي',
+      lines: J.lines.map(l=>({acc:l.acc, dr:Math.round(+l.dr||0), cr:Math.round(+l.cr||0)})) });
+    S.JE=null; $('#layer').innerHTML=''; render(); toast('تم حفظ القيد وتحديث كل التقارير');
+  };
+}
+function accTB(){
+  const rows=trialBalance();
+  const dr=rows.reduce((a,r)=>a+r.netDr,0), cr=rows.reduce((a,r)=>a+r.netCr,0);
+  return `<div class="sechead"><div><h2>ميزان المراجعة</h2><span class="sub">مُستخرَج من ${AR(JOURNAL.length)} قيد · اضغط على حساب لفتح دفتره</span></div>
+    <span class="badge ${Math.abs(dr-cr)<1?'b-quiet':'b-loud'}">${Math.abs(dr-cr)<1?'متوازن':'غير متوازن'}</span></div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>الكود</th><th>اسم الحساب</th><th>إجمالي مدين</th><th>إجمالي دائن</th><th>رصيد مدين</th><th>رصيد دائن</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr class="clickable" data-acc="${r.code}"><td class="code">${arD(r.code)}</td>
+      <td style="font-weight:500">${esc(r.name)}</td><td class="n sub">${EGP(r.dr)}</td><td class="n sub">${EGP(r.cr)}</td>
+      <td class="n">${r.netDr?EGP(r.netDr):'—'}</td><td class="n">${r.netCr?EGP(r.netCr):'—'}</td></tr>`).join('')}
+      <tr class="totalrow"><td></td><td>الإجمالي</td><td class="n">${EGP(rows.reduce((a,r)=>a+r.dr,0))}</td>
+        <td class="n">${EGP(rows.reduce((a,r)=>a+r.cr,0))}</td><td class="n">${EGP(dr)}</td><td class="n">${EGP(cr)}</td></tr>
+    </tbody></table></div>`;
+}
+function accIS(){
+  const P=pnl();
+  const row=(n,v,strong,ind)=>`<tr${strong?' class="totalrow"':''}><td style="padding-right:${ind?34:13}px">${esc(n)}</td><td class="n">${EGP(Math.abs(v))}</td></tr>`;
+  return `<div class="sechead"><h2>قائمة الدخل</h2><span class="sub">مجمّعة لكل الفروع · من دفتر اليومية</span></div>
+  <div class="tscroll"><table><thead><tr><th>البند</th><th style="width:220px">القيمة</th></tr></thead><tbody>
+    ${row('إيرادات المبيعات',P.rev)}
+    ${row('مردودات المبيعات',-P.retn,false,1)}
+    ${row('صافي المبيعات',P.netRev,true)}
+    ${row('تكلفة البضاعة المباعة',P.cogs,false,1)}
+    ${row('مجمل الربح',P.gross,true)}
+    ${P.ops.map(o=>row(o.name,o.amt,false,1)).join('')}
+    ${row('إجمالي المصروفات التشغيلية',P.opex,true)}
+    ${row('صافي الربح',P.net,true)}
+  </tbody></table></div>
+  <p class="sub">هامش مجمل الربح ${AR(Math.round(P.gross/P.netRev*100))}٪ · هامش صافي الربح ${AR(Math.round(P.net/P.netRev*100))}٪</p>`;
+}
+function accBS(){
+  const B=balanceSheet();
+  const sec=(t,items)=>`<tr class="totalrow"><td>${esc(t)}</td><td></td></tr>`+
+    items.map(a=>`<tr><td style="padding-right:34px">${esc(a.name)} <span class="code">${arD(a.code)}</span></td>
+      <td class="n">${a.amt<0?'('+EGP(Math.abs(a.amt))+')':EGP(a.amt)}</td></tr>`).join('');
+  return `<div class="sechead"><div><h2>الميزانية العمومية</h2><span class="sub">كما في ${dmy(new Date())}</span></div>
+    <span class="badge ${Math.abs(B.assets-B.total)<1?'b-quiet':'b-loud'}">${Math.abs(B.assets-B.total)<1?'متوازنة':'غير متوازنة'}</span></div>
+  <div class="row" style="align-items:flex-start; gap:18px">
+    <div style="flex:1 1 340px; min-width:0"><div class="tscroll"><table>
+      <thead><tr><th>الأصول</th><th style="width:170px">القيمة</th></tr></thead><tbody>
+      ${sec('الأصول المتداولة',B.ca)}${sec('الأصول الثابتة',B.fa)}
+      <tr class="totalrow"><td>إجمالي الأصول</td><td class="n">${EGP(B.assets)}</td></tr>
+    </tbody></table></div></div>
+    <div style="flex:1 1 340px; min-width:0"><div class="tscroll"><table>
+      <thead><tr><th>الخصوم وحقوق الملكية</th><th style="width:170px">القيمة</th></tr></thead><tbody>
+      ${sec('الخصوم المتداولة',B.li)}${sec('حقوق الملكية',B.eq)}
+      <tr><td style="padding-right:34px">صافي ربح الفترة</td><td class="n">${EGP(B.net)}</td></tr>
+      <tr class="totalrow"><td>إجمالي الخصوم وحقوق الملكية</td><td class="n">${EGP(B.total)}</td></tr>
+    </tbody></table></div></div>
+  </div>`;
+}
+function accAP(){
+  const total=Math.abs(accBal('2110').bal);
+  const rows=SUPPLIERS.map((s,i)=>{ const share=[0.31,0.24,0.19,0.15,0.11][i];
+    return { name:s, bal:Math.round(total*share), items:STYLES.filter(x=>x.supplier===s).length,
+             due: dayKey(-(10+i*7)) }; });
+  return `<div class="sechead"><h2>الموردون</h2><span class="sub">رصيد حساب الموردين ${EGP(total)}</span></div>
+  <div class="tscroll"><table><thead><tr><th>المورّد</th><th>عدد الأصناف</th><th>الرصيد المستحق</th><th>تاريخ الاستحقاق</th><th>الحالة</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td style="font-weight:700">${esc(r.name)}</td><td class="n">${AR(r.items)}</td>
+      <td class="n">${EGP(r.bal)}</td><td class="sub">${dmy(r.due)}</td>
+      <td><span class="badge ${r.due<new Date()?'b-loud':'b-quiet'}">${r.due<new Date()?'متأخر':'قادم'}</span></td></tr>`).join('')}
+      <tr class="totalrow"><td>الإجمالي</td><td></td><td class="n">${EGP(rows.reduce((a,r)=>a+r.bal,0))}</td><td></td><td></td></tr>
+    </tbody></table></div>`;
+}
+
+/* ============================================================
+   شاشة الفرع
+   ============================================================ */
+function cartTotal(){ return S.cart.reduce((a,c)=>a+c.price*c.qty,0); }
+function viewSell(){
+  const b=BRANCHES.find(x=>x.id===S.branch), q=S.sq.trim();
+  const list=STYLES.filter(s=>!q||s.name.includes(q)||s.code.includes(q));
+  const sub=cartTotal(), vat=Math.round(sub*14/114), items=S.cart.reduce((a,c)=>a+c.qty,0);
+  return `<div class="sechead"><div><h2>البيع — فرع ${esc(b.name)}</h2><span class="sub">اضغط على الصنف لاختيار المقاس واللون</span></div>
+    <input class="srch" id="sq2" placeholder="ابحث عن صنف..." value="${esc(S.sq)}"></div>
+  <div class="poswrap">
+    <div class="pgrid">${list.map(s=>{ const av=branchQty(S.branch,s.code);
+      return `<button class="pcard" data-p="${s.code}" ${av===0?'disabled style="opacity:.5"':''}>
+        <span class="nm">${esc(s.name)}</span><span class="pr">${EGP(s.price)}</span>
+        <span class="av">${av===0?'غير متوفر':'متاح '+AR(av)+' قطعة'}</span></button>`;}).join('')}</div>
+    <div class="card cart">
+      <div class="cart-head"><h3 style="font-size:16px">الفاتورة</h3><span class="sub">${AR(items)} قطعة</span></div>
+      <div class="cart-items">${ S.cart.length ? S.cart.map((c,i)=>`<div class="citem">
+        <div class="cn"><b>${esc(c.name)}</b><span>${c.size} · ${esc(c.color)} × ${AR(c.qty)}</span></div>
+        <span class="n">${EGP(c.price*c.qty)}</span><button class="xbtn" data-rm="${i}" aria-label="حذف">×</button></div>`).join('')
+        : '<p class="empty">لم تتم إضافة أصناف بعد.</p>' }</div>
+      <div class="cart-foot">
+        <div class="ttl"><span>الإجمالي قبل الضريبة</span><span class="n">${EGP(sub-vat)}</span></div>
+        <div class="ttl"><span>ض.ق.م ١٤٪</span><span class="n">${EGP(vat)}</span></div>
+        <div class="ttl grand"><span>المطلوب</span><span class="n">${EGP(sub)}</span></div>
+        <button class="btn btn-primary" id="pay" ${S.cart.length?'':'disabled'}>إتمام البيع</button>
+      </div></div></div>`;
+}
+function viewBStock(){
+  const b=BRANCHES.find(x=>x.id===S.branch), q=S.q.trim();
+  const list=STYLES.filter(s=>!q||s.name.includes(q)||s.code.includes(q));
+  return `<div class="sechead"><div><h2>مخزون فرع ${esc(b.name)}</h2><span class="sub">مخزون هذا الفرع فقط</span></div>
+    <input class="srch" id="sq" placeholder="ابحث عن صنف..." value="${esc(S.q)}"></div>
+  <div class="notice"><span>📦</span><div>الفرع يرى <b>مخزونه هو فقط</b>، ولا يستطيع تغيير سعر أو إنشاء صنف. المخزون المركزي يُدار من شاشة المخزن.</div></div>
+  <div class="tscroll"><table>
+    <thead><tr><th>الكود</th><th>الصنف</th><th>سعر البيع</th><th>المتاح</th><th>الحالة</th><th></th></tr></thead>
+    <tbody>${list.map(s=>{ const qv=branchQty(S.branch,s.code);
+      const st=qv===0?['b-loud','نفد']:qv<=LOW_B?['b-mark','منخفض']:['b-quiet','متاح'];
+      return `<tr><td class="code">${s.code}</td><td style="font-weight:700">${esc(s.name)}</td>
+        <td class="n">${EGP(s.price)}</td><td class="n">${AR(qv)}</td>
+        <td><span class="badge ${st[0]}">${st[1]}</span></td>
+        <td><button class="btn btn-sm" data-g="${s.code}">عرض المقاسات</button></td></tr>`;}).join('')}
+    </tbody></table></div>`;
+}
+function viewRets(){
+  const b=BRANCHES.find(x=>x.id===S.branch);
+  const rets=last30Of(S.branch).filter(m=>m.kind==='return');
+  return `<div class="sechead"><div><h2>المرتجعات — فرع ${esc(b.name)}</h2><span class="sub">آخر ٣٠ يوماً</span></div>
+    <button class="btn btn-primary btn-sm" id="newret">+ تسجيل مرتجع</button></div>
+  <div class="tiles">
+    <div class="tile"><span class="lbl">عدد المرتجعات</span><span class="val">${AR(rets.length)}</span><span class="meta">٣٠ يوم</span></div>
+    <div class="tile"><span class="lbl">قيمة المرتجعات</span><span class="val">${EGP(rets.reduce((a,t)=>a+t.value,0))}</span><span class="meta">—</span></div>
+    <div class="tile"><span class="lbl">نسبة للمبيعات</span><span class="val">${AR(Math.round(rets.reduce((a,t)=>a+t.value,0)/monthSales(S.branch)*100))}٪</span><span class="meta">الشهر الحالي</span></div>
+  </div>
+  <div class="tscroll"><table><thead><tr><th>رقم</th><th>التاريخ</th><th>الصنف</th><th>المقاس واللون</th><th>العدد</th><th>القيمة</th></tr></thead>
+    <tbody>${ rets.length ? rets.map(t=>`<tr><td class="code">${t.id}</td><td class="sub">${dmy(t.at)}</td>
+      <td>${esc(t.name)}</td><td class="sub">${t.size} · ${esc(t.color)}</td><td class="n">${AR(t.qty)}</td>
+      <td class="n">${EGP(t.value)}</td></tr>`).join('') : '<tr><td colspan="6" class="empty">لا توجد مرتجعات.</td></tr>' }
+    </tbody></table></div>`;
+}
+function viewLog(){
+  const b=BRANCHES.find(x=>x.id===S.branch), tx=last30Of(S.branch);
+  return `<div class="sechead"><div><h2>سجل الشهر — فرع ${esc(b.name)}</h2><span class="sub">${AR(tx.length)} حركة</span></div></div>
+  <div class="notice"><span>🗓️</span><div>شاشة الفرع تحتفظ بـ<b>آخر ٣٠ يوماً فقط</b>. كل ما هو أقدم محفوظ في ملف الفرع داخل الإدارة الرئيسية، ولا يمكن تعديله من هنا.</div></div>
+  <div class="tscroll tall"><table>
+    <thead><tr><th>رقم</th><th>التاريخ</th><th>النوع</th><th>الصنف</th><th>المقاس واللون</th><th>العدد</th><th>القيمة</th></tr></thead>
+    <tbody>${tx.map(t=>`<tr><td class="code">${t.id}</td><td class="sub">${dmy(t.at)}</td>
+      <td><span class="badge ${t.kind==='sale'?'b-quiet':t.kind==='return'?'b-loud':'b-mark'}">${MTYPES[t.kind].label}</span></td>
+      <td>${esc(t.name)}</td><td class="sub">${t.size} · ${esc(t.color)}</td><td class="n">${AR(t.qty)}</td>
+      <td class="n">${EGP(t.value)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+/* ---------- شبكة المقاسات ---------- */
+function tone(q){ return q===0?'q0': q<=3?'q1': q<=9?'q2':'q3'; }
+function gridHTML(code,bid,clickable,withCodes){
+  const s=styleBy(code), src=bid?STOCK[bid][code]:null;
+  const val=(sz,cl)=> bid ? (src[vkey(sz,cl)]||0) : BRANCHES.reduce((a,b)=>a+(STOCK[b.id][code]?STOCK[b.id][code][vkey(sz,cl)]||0:0),0);
+  return `<div style="overflow-x:auto"><table class="vgrid">
+    <thead><tr><th></th>${s.sizes.map(z=>`<th>${z}</th>`).join('')}</tr></thead>
+    <tbody>${s.colors.map(cl=>`<tr><th style="text-align:right">${esc(cl)}</th>
+      ${s.sizes.map(z=>{ const q=val(z,cl);
+        return `<td>${ clickable ? `<button class="vcell ${tone(q)}" data-add="${code}|${z}|${cl}" ${q===0?'disabled':''}>${AR(q)}</button>`
+          : `<div class="vcell ${tone(q)}">${AR(q)}</div>` }</td>`;}).join('')}</tr>`).join('')}
+    </tbody></table></div>
+  <div class="legend"><span>الكمية:</span>
+    <span><i style="background:var(--surface); border:1px dashed var(--line-2)"></i>نفد</span>
+    <span><i style="background:var(--surface-2); border:1px solid var(--line)"></i>١–٣</span>
+    <span><i style="background:var(--surface-3); border:1px solid var(--line)"></i>٤–٩</span>
+    <span><i style="background:var(--accent)"></i>١٠ فأكثر</span></div>
+  ${ withCodes ? `<div class="tscroll"><table><thead><tr><th>المتغيّر</th><th>الكود</th><th>الباركود</th><th>الكمية</th></tr></thead>
+    <tbody>${s.colors.flatMap(cl=>s.sizes.map(z=>`<tr><td>${z} · ${esc(cl)}</td>
+      <td class="code">${sku(s,z,cl)}</td><td class="code">${bcode(s,z,cl)}</td>
+      <td class="n">${AR(val(z,cl))}</td></tr>`)).join('')}</tbody></table></div>` : '' }`;
+}
+
+function openModal(title, body, keepState){
+  $('#layer').innerHTML=`<div class="ovl" id="ovl"><div class="modal wide" role="dialog" aria-modal="true">
+    <div class="modal-h"><h3 style="font-size:17px">${title}</h3><button class="xbtn" id="mx" aria-label="إغلاق" style="font-size:22px">×</button></div>
+    <div class="modal-b" id="modal-body">${body}</div></div></div>`;
+  const close=()=>{ if(!keepState){ } $('#layer').innerHTML=''; };
+  $('#mx').onclick=()=>{ S.NI=null; S.JE=null; close(); };
+  $('#ovl').onclick=e=>{ if(e.target.id==='ovl'){ S.NI=null; S.JE=null; close(); } };
+}
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+
+/* ============================================================
+   الربط
+   ============================================================ */
+function wire(){
+  const back=$('#back'); if(back) back.onclick=()=>{ S.profile=null; render(); };
+  const backA=$('#back-acc'); if(backA) backA.onclick=()=>{ S.ledger=null; render(); };
+  document.querySelectorAll('tr[data-b]').forEach(r=> r.onclick=()=>{ S.profile=+r.dataset.b; render(); });
+  document.querySelectorAll('[data-bv]').forEach(b=> b.onclick=()=>{ S.bview=b.dataset.bv; render(); });
+  document.querySelectorAll('[data-av]').forEach(b=> b.onclick=()=>{ S.accview=b.dataset.av; S.ledger=null; render(); });
+  document.querySelectorAll('[data-wv]').forEach(b=> b.onclick=()=>{ S.whview=b.dataset.wv; S.q=''; render(); });
+  document.querySelectorAll('tr[data-acc]').forEach(r=> r.onclick=()=>{ S.ledger=r.dataset.acc; render(); });
+
+  const keepFocus=(id,fn)=>{ const el=$('#'+id); if(!el) return;
+    el.oninput=e=>{ const p=e.target.selectionStart; fn(e.target.value); render();
+      const n=$('#'+id); if(n){ n.focus(); try{n.setSelectionRange(p,p);}catch(err){} } }; };
+  keepFocus('sq', v=>S.q=v); keepFocus('sq2', v=>S.sq=v);
+  keepFocus('f-q', v=>S.F.q=v);
+  ['f-from','f-to','f-branch'].forEach(id=>{ const el=$('#'+id); if(el) el.onchange=e=>{
+    S.F[id==='f-from'?'from':id==='f-to'?'to':'branch']=e.target.value; render(); }; });
+  document.querySelectorAll('[data-ty]').forEach(b=> b.onclick=()=>{ const k=b.dataset.ty;
+    if(k==='__all') Object.keys(MTYPES).forEach(x=>S.F.types[x]=1);
+    else if(k==='__none') Object.keys(MTYPES).forEach(x=>S.F.types[x]=0);
+    else S.F.types[k]=S.F.types[k]?0:1;
+    render(); });
+  const fr=$('#f-reset'); if(fr) fr.onclick=()=>{ S.F={from:iso(dayKey(29)),to:iso(dayKey(0)),branch:'all',
+    types:{sale:1,return:1,receipt:1,transfer:1,count:1},q:''}; render(); };
+
+  /* المخزن */
+  const wn=$('#w-new'); if(wn) wn.onclick=()=>{ S.NI=null; openNewItem(); };
+  document.querySelectorAll('[data-wf]').forEach(b=> b.onclick=()=> openWF(b.dataset.wf));
+  document.querySelectorAll('tr[data-s]').forEach(r=> r.onclick=()=>{ const s=styleBy(r.dataset.s);
+    openModal(esc(s.name)+' <span class="code">'+s.code+'</span>',
+      `<p class="sub">${esc(s.cat)} · ${esc(s.season)} · المورّد ${esc(s.supplier)} · تكلفة ${EGP(s.cost)} · بيع ${EGP(s.price)}</p>
+       ${gridHTML(s.code,null,false,true)}
+       <h4 style="font-size:14px">التوزيع على الفروع</h4>
+       <div class="tscroll"><table><thead><tr><th>الفرع</th><th>الكمية</th><th>حد الطلب</th><th>قيمة المخزون</th><th>الحالة</th></tr></thead>
+       <tbody>${BRANCHES.map(b=>{ const q=branchQty(b.id,s.code);
+         return `<tr><td>${esc(b.name)}</td><td class="n">${AR(q)}</td><td class="n sub">${AR(s.reorder)}</td>
+           <td class="n">${EGP(q*s.cost)}</td>
+           <td><span class="badge ${q===0?'b-loud':q<=s.reorder?'b-mark':'b-quiet'}">${q===0?'نفد':q<=s.reorder?'تحت الحد':'متاح'}</span></td></tr>`;}).join('')}
+       </tbody></table></div>`);
+  });
+
+  /* المحاسب */
+  const jn=$('#je-new'); if(jn) jn.onclick=()=>{ S.JE=null; openJE(); };
+  document.querySelectorAll('tr[data-je]').forEach(r=> r.onclick=()=>{
+    const j=JOURNAL.find(x=>x.id===r.dataset.je);
+    openModal('قيد '+j.id, `<p class="sub">${dmy(j.date)} · ${esc(j.desc)} · المصدر ${esc(j.src)}</p>
+      <div class="tscroll"><table><thead><tr><th>الحساب</th><th>مدين</th><th>دائن</th></tr></thead>
+      <tbody>${j.lines.map(l=>`<tr><td><span class="code">${arD(l.acc)}</span> ${esc(accBy(l.acc)?accBy(l.acc).name:'')}</td>
+        <td class="n">${l.dr?EGP(l.dr):'—'}</td><td class="n">${l.cr?EGP(l.cr):'—'}</td></tr>`).join('')}
+        <tr class="totalrow"><td>الإجمالي</td><td class="n">${EGP(j.lines.reduce((a,l)=>a+l.dr,0))}</td>
+          <td class="n">${EGP(j.lines.reduce((a,l)=>a+l.cr,0))}</td></tr>
+      </tbody></table></div>`);
+  });
+
+  /* الفرع */
+  document.querySelectorAll('button[data-g]').forEach(b=> b.onclick=()=>{ const s=styleBy(b.dataset.g);
+    openModal(esc(s.name)+' <span class="code">'+s.code+'</span>',
+      `<p class="sub">المتاح في هذا الفرع حسب المقاس واللون.</p>${gridHTML(s.code,S.branch,false,true)}`); });
+  document.querySelectorAll('button[data-p]').forEach(b=> b.onclick=()=>{ const s=styleBy(b.dataset.p);
+    openModal(esc(s.name)+' — '+EGP(s.price),
+      `<p class="sub">اختر المقاس واللون لإضافته إلى الفاتورة.</p>${gridHTML(s.code,S.branch,true)}`);
+    document.querySelectorAll('button[data-add]').forEach(c=> c.onclick=()=>{
+      const [code,sz,cl]=c.dataset.add.split('|'), st=styleBy(code);
+      const ex=S.cart.find(x=>x.code===code&&x.size===sz&&x.color===cl);
+      if(ex) ex.qty++; else S.cart.push({code,name:st.name,size:sz,color:cl,price:st.price,qty:1});
+      $('#layer').innerHTML=''; render(); }); });
+  document.querySelectorAll('button[data-rm]').forEach(b=> b.onclick=()=>{ S.cart.splice(+b.dataset.rm,1); render(); });
+  const pay=$('#pay'); if(pay) pay.onclick=()=>{
+    const total=cartTotal(), bid=S.branch, first=S.cart[0];
+    S.cart.forEach(c=>{ const m=STOCK[bid][c.code], k=vkey(c.size,c.color); m[k]=Math.max(0,(m[k]||0)-c.qty); });
+    MOVES.unshift({ id:'INV-'+String(bid).padStart(2,'0')+'-'+(++mSeq), at:new Date(), bid, kind:'sale',
+      code:first.code, name:first.name+(S.cart.length>1?` +${S.cart.length-1}`:''), size:first.size, color:first.color,
+      qty:S.cart.reduce((a,c)=>a+c.qty,0), value:total, pay:'كاش',
+      by:(BRANCHES.find(b=>b.id===bid)||{}).manager });
+    DAILY[bid][DAILY[bid].length-1].total += total;
+    S.cart=[]; render(); toast('تم إتمام البيع · '+EGP(total)); };
+  const nr=$('#newret'); if(nr) nr.onclick=()=>{
+    openModal('تسجيل مرتجع', `<p class="sub">في النظام الحقيقي يُبحث برقم الفاتورة ثم يُختار الصنف المرتجع.</p>
+      <div class="stack-s"><input class="srch" style="max-width:none; width:100%" placeholder="رقم الفاتورة — مثال INV-٠٣-٤١٢٧">
+      <div class="row" style="justify-content:flex-end"><button class="btn btn-primary" id="rdone">بحث عن الفاتورة</button></div></div>`);
+    $('#rdone').onclick=()=>{ $('#layer').innerHTML=''; toast('نموذج عرض فقط في النسخة التجريبية'); }; };
+}
+
+setMode('admin');
+</script>
+
+</body>
+</html>

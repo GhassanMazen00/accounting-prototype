@@ -1,3 +1,56 @@
+# Client Demo Prototypes
+
+Two self-contained, presentation-ready demos. Both are static sites with no backend,
+no API keys and no real customer data, published from this repository via GitHub Pages.
+
+| Demo | Live | Source |
+|---|---|---|
+| **AZ Accounting** — Arabic receivables and invoicing, role-based | [`/`](https://ghassanmazen00.github.io/accounting-prototype/) | repository root |
+| **Marshmallow** — Arabic retail: head office, warehouse, accounting, 15 branches | [`/marshmallow/`](https://ghassanmazen00.github.io/accounting-prototype/marshmallow/) | `marshmallow/` |
+
+---
+
+# Marshmallow — Retail System Demo
+
+An Arabic, right-to-left demo of a three-in-one retail system for a 15-branch
+womenswear chain: selling, stock and books in one place. Everything is fictional —
+invented branches, staff, styles and figures.
+
+Open it and use the switcher at the top. It has four workstations, one per role:
+
+| Workstation | What it does |
+|---|---|
+| **الإدارة الرئيسية** | Dashboard, all 15 branches with full history, plus read-only copies of the warehouse and the books |
+| **شاشة المخزن** | Item master with size/colour variants, barcodes and pricing; goods receipts, transfers, stock counts |
+| **شاشة المحاسب** | Chart of accounts, journal, trial balance, income statement, balance sheet, suppliers |
+| **شاشة الفرع** | The shop floor: sell, own stock, returns, and a rolling 30-day log |
+
+### Things worth clicking
+
+- **شاشة الفرع → البيع** — tap a garment and the size × colour grid opens showing that
+  branch's availability. Pick a cell, build the invoice, complete the sale. Stock drops.
+- **شاشة المخزن → الأصناف → + صنف جديد** — name an item, tap sizes and colours, set cost
+  and price. The variant matrix, codes and barcodes generate as you type.
+- **شاشة المخزن → التحويلات** — move stock between the main warehouse and a branch.
+  Both sides update, and the movement appears in the admin's movement log.
+- **شاشة المحاسب → قيود اليومية → + قيد يدوي** — save stays disabled until debits equal
+  credits. Post one and the trial balance and balance sheet both move.
+- **الإدارة الرئيسية → الفروع → حركات كل الفروع** — every movement across all branches,
+  filtered by date range, branch, movement type and free text.
+
+### How it is built
+
+One HTML file, no framework and no build step. Deterministic seeded dummy data:
+15 branches, 14 styles with ~196 variants, 90 days of sales, and a 21-account ledger.
+Every report is derived from the journal rather than hard-coded, so the trial balance
+foots and the balance sheet balances. Colour is deliberately absent — state is carried
+by weight, fill and border instead, so the interface reads the same in light and dark.
+
+**Not yet wired:** journals are generated monthly in aggregate rather than posted per
+sale, and goods receipts, transfers and stock counts do not yet post to the ledger.
+
+---
+
 # AZ Accounting — Demo Prototype
 
 A self-contained, presentation-ready version of the AZ Accounting web app, built for
