@@ -210,6 +210,9 @@
     background:var(--surface-2); display:flex; align-items:center; justify-content:center;
     color:var(--ink-3); font-size:15px; }
   .thumb-lg { width:120px; height:144px; }
+  .thumb-ph .gl { width:22px; height:22px; }
+  .thumb-ph.thumb-lg .gl { width:48px; height:48px; }
+  .pthumb-ph .gl { width:40px; height:40px; }
   .pthumb { width:100%; aspect-ratio:3/4; border-radius:8px; object-fit:cover; display:block;
     border:1px solid var(--line); background:var(--surface-2); margin-bottom:4px; }
   .pthumb-ph { width:100%; aspect-ratio:3/4; border-radius:8px; border:1px dashed var(--line-2);
@@ -306,7 +309,16 @@ const PALETTE = ['أسود','أبيض','بيج','وردي','كحلي','زيتي'
 const CATS    = ['فساتين','بلوزات','بناطيل','تنانير','جاكيتات','تريكو'];
 const SEASONS = ['صيف ٢٠٢٦','ربيع ٢٠٢٦','شتاء ٢٠٢٥'];
 const SUPPLIERS = ['مصنع الدلتا للنسيج','شركة النيل للأقمشة','مجموعة الشرق للملابس','تكس بورت للاستيراد','مصنع المحلة الكبرى'];
-const SIZECODE = {S:'1',M:'2',L:'3',XL:'4'};
+const SIZECODE = {S:'1',M:'2',L:'3',XL:'4',XXL:'5'};
+/* قوالب جاهزة لكل تصنيف — تملأ المقاسات والألوان بضغطة واحدة */
+const CAT_TPL = {
+  'فساتين': { sizes:['S','M','L','XL'], colors:['أسود','بيج','وردي'] },
+  'بلوزات': { sizes:['S','M','L'],      colors:['أبيض','أسود','وردي'] },
+  'بناطيل': { sizes:['S','M','L','XL'], colors:['كحلي','أسود','بيج'] },
+  'تنانير': { sizes:['S','M','L'],      colors:['أسود','بيج'] },
+  'جاكيتات':{ sizes:['M','L','XL'],     colors:['كحلي','أسود','بني'] },
+  'تريكو':  { sizes:['S','M','L','XL'], colors:['بيج','نبيتي','زيتي'] }
+};
 
 let styleSeq = 1000;
 const STYLES = [
@@ -795,9 +807,11 @@ function whItems(){
     <div class="tile"><span class="lbl">تحت حد الطلب</span><span class="val">${AR(under)}</span><span class="meta">يحتاج توريد</span></div>
   </div>
   <div class="sechead"><h2>الأصناف</h2>
-    ${ RO() ? '<span class="badge b-mark">عرض فقط</span>'
-      : '<button class="btn btn-primary btn-sm" id="w-new">+ صنف جديد</button>' }</div>
-  ${ RO() ? '' : '<div class="notice"><span>🏷️</span><div>كل صنف يُعرَّف مرة واحدة هنا، فيولّد النظام <b>متغيّراً لكل مقاس ولون</b> بكود وباركود مستقلّين. الفروع تستقبل الأصناف ولا تنشئها ولا تغيّر أسعارها.</div></div>' }
+    ${ RO() ? '<span class="badge b-mark">عرض فقط</span>' : `<div class="row" style="gap:8px">
+      <button class="btn btn-primary btn-sm" id="w-new">+ صنف جديد</button>
+      <button class="btn btn-sm" id="w-clone">نسخ صنف موجود</button>
+      <button class="btn btn-sm" id="w-import">استيراد من ملف</button></div>` }</div>
+  ${ RO() ? '' : '<div class="notice"><span>🏷️</span><div>ثلاث طرق للترميز: <b>صنف جديد</b> بقالب جاهز لكل تصنيف، أو <b>نسخ صنف موجود</b> وتغيير الاسم والسعر فقط، أو <b>استيراد ملف</b> لإدخال عشرات الأصناف دفعة واحدة. في كل الحالات يولّد النظام متغيّراً لكل مقاس ولون بكود وباركود مستقلّين.</div></div>' }
   <div class="row" style="justify-content:space-between">
     <input class="srch" id="sq" placeholder="ابحث بالاسم أو الكود أو التصنيف..." value="${esc(S.q)}" style="flex:1; max-width:340px">
     <span class="sub">${AR(list.length)} صنف</span></div>
@@ -924,6 +938,108 @@ function adjForm(){
   <div class="row" style="justify-content:flex-end"><button class="btn" id="w-cancel">إلغاء</button>
     <button class="btn btn-primary" id="w-save" ${diffs.length?'':'disabled'}>ترحيل ${AR(diffs.length)} فرق</button></div>`;
 }
+/* ---------- نسخ صنف موجود ---------- */
+function cloneForm(){
+  return `<p class="sub">اختر صنفاً قائماً — يُنسخ التصنيف والموسم والمقاسات والألوان والمورّد والأسعار، ولا يبقى عليك سوى الاسم.</p>
+  <div class="f-full"><label for="cl-src">الصنف المصدر</label>
+    <select id="cl-src">${STYLES.map(x=>`<option value="${x.code}">${esc(x.name)} — ${x.code} · ${esc(x.cat)} · ${AR(x.colors.length*x.sizes.length)} متغيّر</option>`).join('')}</select></div>
+  <div class="row" style="justify-content:flex-end"><button class="btn" id="cl-cancel">إلغاء</button>
+    <button class="btn btn-primary" id="cl-go">فتح نسخة للتعديل</button></div>`;
+}
+
+/* ---------- استيراد أصناف من ملف ---------- */
+const IMP_COLS = 'الاسم,التصنيف,الموسم,التكلفة,السعر,المقاسات,الألوان';
+const IMP_SAMPLE = IMP_COLS + '\n' +
+  'فستان شيفون طويل,فساتين,صيف ٢٠٢٦,520,1490,S|M|L|XL,أسود|بيج|وردي\n' +
+  'بلوزة ساتان,بلوزات,ربيع ٢٠٢٦,310,890,S|M|L,أبيض|أسود\n' +
+  'بنطلون كتان,بناطيل,صيف ٢٠٢٦,400,1150,M|L|XL,بيج|كحلي\n' +
+  'كارديجان قطن,تريكو,شتاء ٢٠٢٥,480,1320,S|M|L|XL,نبيتي|زيتي';
+function parseImport(text){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return [];
+  const start = lines[0].includes('الاسم') ? 1 : 0;
+  return lines.slice(start).map((ln,i)=>{
+    const c = ln.split(',').map(x=>x.trim());
+    const sizes  = (c[5]||'').split('|').map(x=>x.trim()).filter(x=>SIZECODE[x]);
+    const colors = (c[6]||'').split('|').map(x=>x.trim()).filter(x=>PALETTE.includes(x));
+    const cost=+c[3], price=+c[4];
+    const errs=[];
+    if(!c[0]) errs.push('بلا اسم');
+    if(!CATS.includes(c[1])) errs.push('تصنيف غير معروف');
+    if(!(cost>0)) errs.push('تكلفة غير صحيحة');
+    if(!(price>cost)) errs.push('السعر يجب أن يتجاوز التكلفة');
+    if(!sizes.length) errs.push('بلا مقاسات');
+    if(!colors.length) errs.push('بلا ألوان صالحة');
+    return { row:i+1, name:c[0]||'', cat:c[1]||'', season:CATS.includes(c[1])?(SEASONS.includes(c[2])?c[2]:SEASONS[0]):'',
+             cost, price, sizes, colors, errs, vars:sizes.length*colors.length };
+  });
+}
+function importForm(){
+  S.IMP = S.IMP || { text:'' };
+  const rows = parseImport(S.IMP.text);
+  const ok = rows.filter(r=>!r.errs.length), bad = rows.filter(r=>r.errs.length);
+  const vars = ok.reduce((a,r)=>a+r.vars,0);
+  return `<p class="sub">الصق الصفوف أو اختر ملف CSV. كل سطر صنف واحد، والمقاسات والألوان مفصولة بعلامة <span class="code">|</span>.</p>
+  <div class="fieldset"><h4>الأعمدة المطلوبة</h4>
+    <p class="code" style="white-space:normal; direction:rtl">${esc(IMP_COLS)}</p>
+    <div class="row" style="gap:8px">
+      <label class="filebtn" for="imp-file">اختيار ملف CSV…</label>
+      <input type="file" id="imp-file" accept=".csv,text/csv,text/plain">
+      <button class="btn btn-sm" id="imp-sample">تعبئة بمثال</button>
+      ${ S.IMP.text ? '<button class="btn btn-sm" id="imp-clear">مسح</button>' : '' }
+    </div>
+    <textarea id="imp-text" rows="6" placeholder="${esc(IMP_COLS)}"
+      style="width:100%; padding:10px 12px; border:1px solid var(--line-2); border-radius:8px;
+      background:var(--surface); color:var(--ink); font-family:var(--mono); font-size:12.5px;
+      direction:rtl; resize:vertical">${esc(S.IMP.text)}</textarea>
+  </div>
+  ${ rows.length ? `<div class="fieldset"><h4>المعاينة</h4>
+    <div class="row" style="gap:10px">
+      <span class="badge b-quiet">${AR(ok.length)} صنف جاهز</span>
+      ${ bad.length ? `<span class="badge b-loud">${AR(bad.length)} صف به خطأ</span>` : '' }
+      <span class="sub">سيُنشأ ${AR(vars)} متغيّر بأكواد وباركود</span>
+    </div>
+    <div class="tscroll" style="max-height:300px; overflow-y:auto"><table>
+      <thead><tr><th>#</th><th>الاسم</th><th>التصنيف</th><th>التكلفة</th><th>البيع</th><th>متغيّرات</th><th>الحالة</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td class="n sub">${AR(r.row)}</td>
+        <td style="font-weight:${r.errs.length?'400':'700'}">${esc(r.name)||'—'}</td>
+        <td class="sub">${esc(r.cat)||'—'}</td>
+        <td class="n sub">${r.cost>0?EGP(r.cost):'—'}</td><td class="n">${r.price>0?EGP(r.price):'—'}</td>
+        <td class="n">${r.errs.length?'—':AR(r.vars)}</td>
+        <td>${ r.errs.length ? `<span class="badge b-loud">${esc(r.errs[0])}</span>`
+                             : '<span class="badge b-quiet">جاهز</span>' }</td></tr>`).join('')}
+      </tbody></table></div></div>` : '' }
+  <div class="row" style="justify-content:flex-end"><button class="btn" id="imp-cancel">إلغاء</button>
+    <button class="btn btn-primary" id="imp-go" ${ok.length?'':'disabled'}>استيراد ${AR(ok.length)} صنف</button></div>`;
+}
+function openImport(){ S.IMP={text:''}; openModal('استيراد أصناف من ملف', importForm()); wireImport(); }
+function wireImport(){
+  const re=(keepCaret)=>{ const ta=$('#imp-text'); const pos = ta?ta.selectionStart:null;
+    $('#modal-body').innerHTML=importForm(); wireImport();
+    if(keepCaret){ const n=$('#imp-text'); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } } };
+  const ta=$('#imp-text'); if(ta) ta.oninput=e=>{ S.IMP.text=e.target.value; re(true); };
+  const sm=$('#imp-sample'); if(sm) sm.onclick=()=>{ S.IMP.text=IMP_SAMPLE; re(); };
+  const cl=$('#imp-clear'); if(cl) cl.onclick=()=>{ S.IMP.text=''; re(); };
+  const f=$('#imp-file'); if(f) f.onchange=e=>{ const file=e.target.files && e.target.files[0]; if(!file) return;
+    const fr=new FileReader(); fr.onload=()=>{ S.IMP.text=String(fr.result||''); re(); };
+    fr.onerror=()=>toast('تعذّرت قراءة الملف'); fr.readAsText(file,'utf-8'); };
+  const c=$('#imp-cancel'); if(c) c.onclick=()=>{ S.IMP=null; $('#layer').innerHTML=''; };
+  const go=$('#imp-go'); if(go) go.onclick=()=>{
+    const ok = parseImport(S.IMP.text).filter(r=>!r.errs.length);
+    let nv=0;
+    ok.forEach(r=>{
+      const st={ code:'MRS-'+(++styleSeq), name:r.name, price:r.price, cat:r.cat, cost:r.cost,
+        colors:r.colors.slice(), sizes:r.sizes.slice(), season:r.season, reorder:50,
+        supplier:SUPPLIERS[0], depth:1, img:null, bmode:'auto' };
+      STYLES.push(st); nv += st.colors.length*st.sizes.length;
+      [{id:WH_ID}, ...BRANCHES].forEach(b=>{ const m={};
+        st.colors.forEach(cl2=> st.sizes.forEach(sz=>{ m[vkey(sz,cl2)]=0; })); STOCK[b.id][st.code]=m; });
+    });
+    S.IMP=null; $('#layer').innerHTML=''; render();
+    toast('تم استيراد '+AR(ok.length)+' صنف · '+AR(nv)+' متغيّر');
+  };
+}
+
 const WF_META = { grn:['إذن توريد جديد',grnForm], trf:['تحويل جديد',trfForm], adj:['جرد وتسوية',adjForm] };
 function openWF(kind){ wfInit(kind); openModal(WF_META[kind][0], WF_META[kind][1]()); wireWF(); }
 function wireWF(){
@@ -977,7 +1093,8 @@ function wireWF(){
 /* نموذج صنف جديد — يولّد المتغيّرات والأكواد والباركود مباشرةً */
 function newItemForm(){
   S.NI = S.NI || { name:'', cat:CATS[0], season:SEASONS[0], cost:'', price:'', reorder:50,
-                   supplier:SUPPLIERS[0], colors:['أسود'], sizes:['S','M','L'], img:null };
+                   supplier:SUPPLIERS[0], colors:CAT_TPL[CATS[0]].colors.slice(),
+                   sizes:CAT_TPL[CATS[0]].sizes.slice(), img:null, bmode:'auto' };
   const N=S.NI;
   const nVar = N.colors.length*N.sizes.length;
   const margin = (N.cost>0 && N.price>0) ? Math.round((N.price-N.cost)/N.price*100) : null;
@@ -1016,6 +1133,8 @@ function newItemForm(){
   </div>
   <div class="fieldset">
     <h4>المقاسات والألوان</h4>
+    <p class="hint">طُبِّق قالب «${esc(N.cat)}» تلقائياً — عدّله إن لزم.
+      <button class="btn btn-sm" id="n-tpl" style="margin-inline-start:6px">إعادة تطبيق القالب</button></p>
     <div class="f-full"><label>المقاسات</label>
       <div class="chips">${['S','M','L','XL','XXL'].map(z=>`<button data-nsz="${z}" aria-pressed="${N.sizes.includes(z)}">${z}</button>`).join('')}</div></div>
     <div class="f-full"><label>الألوان</label>
@@ -1034,14 +1153,21 @@ function newItemForm(){
     </div>
   </div>
   <div class="fieldset">
-    <h4>معاينة الأكواد</h4>
+    <h4>الترميز والباركود</h4>
+    <div class="chips">
+      <button data-bm="auto" aria-pressed="${N.bmode!=='supplier'}">ترقيم تلقائي من النظام</button>
+      <button data-bm="supplier" aria-pressed="${N.bmode==='supplier'}">باركود المورّد الموجود</button>
+    </div>
+    <p class="hint">${ N.bmode==='supplier'
+      ? 'لن يولّد النظام باركوداً. عند استلام التوريد يُمسح باركود كل قطعة فيُربط تلقائياً بالمقاس واللون — أسرع طريقة إن كانت البضاعة تصل مُلصَقة من المصنع.'
+      : 'يولّد النظام كوداً وباركوداً لكل متغيّر، وتُطبع الملصقات من المخزن.' }</p>
     <p class="hint">الكود التالي في التسلسل: <span class="code">${nextCode}</span></p>
     <div class="tscroll"><table><thead><tr><th>المتغيّر</th><th>الكود</th><th>الباركود</th><th>التكلفة</th><th>البيع</th></tr></thead>
       <tbody>${ nVar ? preview.map(v=>{
-        const fake={code:nextCode};
         return `<tr><td>${v.sz} · ${esc(v.cl)}</td>
           <td class="code">${nextCode}-${SIZECODE[v.sz]||'5'}${colIdx(v.cl)}</td>
-          <td class="code">62${nextCode.slice(4)}${SIZECODE[v.sz]||'5'}${colIdx(v.cl)}${String((+nextCode.slice(4)*7)%10000).padStart(4,'0')}</td>
+          <td class="code">${ N.bmode==='supplier' ? '<span class="sub">يُمسح عند الاستلام</span>'
+            : '62'+nextCode.slice(4)+(SIZECODE[v.sz]||'5')+colIdx(v.cl)+String((+nextCode.slice(4)*7)%10000).padStart(4,'0') }</td>
           <td class="n sub">${N.cost?EGP(N.cost):'—'}</td><td class="n">${N.price?EGP(N.price):'—'}</td></tr>`;}).join('')
         : '<tr><td colspan="5" class="empty">اختر مقاساً ولوناً على الأقل.</td></tr>' }
         ${ nVar>8 ? `<tr><td colspan="5" class="sub">…و${AR(nVar-8)} متغيّراً آخر</td></tr>` : '' }
@@ -1052,8 +1178,12 @@ function newItemForm(){
     <button class="btn btn-primary" id="n-save" ${ok?'':'disabled'}>حفظ الصنف وإنشاء ${AR(nVar)} متغيّر</button>
   </div>`;
 }
-function openNewItem(){
-  openModal('صنف جديد', newItemForm(), true);
+function openNewItem(fromCode){
+  if (fromCode){ const o=styleBy(fromCode);
+    S.NI = { name:o.name+' — نسخة', cat:o.cat, season:o.season, cost:o.cost, price:o.price,
+             reorder:o.reorder, supplier:o.supplier, colors:o.colors.slice(), sizes:o.sizes.slice(),
+             img:o.img||null, bmode:o.bmode||'auto' }; }
+  openModal(fromCode?'نسخ صنف':'صنف جديد', newItemForm(), true);
   wireNewItem();
 }
 function wireNewItem(){
@@ -1064,7 +1194,12 @@ function wireNewItem(){
     el.oninput = e => { N[key] = num ? e.target.value : e.target.value; re(id, e.target.selectionStart); }; };
   bindTxt('n-name','name'); bindTxt('n-cost','cost',1); bindTxt('n-price','price',1); bindTxt('n-re','reorder',1);
   ['n-cat','n-season','n-sup'].forEach((id,i)=>{ const el=$('#'+id); if(el) el.onchange=e=>{
-    N[['cat','season','supplier'][i]]=e.target.value; re(); }; });
+    const key=['cat','season','supplier'][i]; N[key]=e.target.value;
+    if(key==='cat' && CAT_TPL[N.cat]){ N.sizes=CAT_TPL[N.cat].sizes.slice(); N.colors=CAT_TPL[N.cat].colors.slice(); }
+    re(); }; });
+  const tpl=$('#n-tpl'); if(tpl) tpl.onclick=()=>{ const t=CAT_TPL[N.cat];
+    if(t){ N.sizes=t.sizes.slice(); N.colors=t.colors.slice(); } re(); };
+  document.querySelectorAll('[data-bm]').forEach(b=> b.onclick=()=>{ N.bmode=b.dataset.bm; re(); });
   document.querySelectorAll('[data-nsz]').forEach(b=> b.onclick=()=>{ const z=b.dataset.nsz;
     N.sizes.includes(z) ? N.sizes.splice(N.sizes.indexOf(z),1) : N.sizes.push(z);
     N.sizes.sort((a,b)=>['S','M','L','XL','XXL'].indexOf(a)-['S','M','L','XL','XXL'].indexOf(b)); re(); });
@@ -1078,7 +1213,7 @@ function wireNewItem(){
   const save=$('#n-save'); if(save) save.onclick=()=>{
     const s = { code:'MRS-'+(++styleSeq), name:N.name.trim(), price:+N.price, cat:N.cat, cost:+N.cost,
       colors:N.colors.slice(), sizes:N.sizes.slice(), season:N.season, reorder:+N.reorder||50,
-      supplier:N.supplier, depth:1, img:N.img };
+      supplier:N.supplier, depth:1, img:N.img, bmode:N.bmode };
     STYLES.push(s);
     [{id:WH_ID}, ...BRANCHES].forEach(b=>{ const m={};
       s.colors.forEach(cl=> s.sizes.forEach(sz=>{ m[vkey(sz,cl)]=0; }));
@@ -1592,7 +1727,11 @@ function viewSell(){
   const list=STYLES.filter(s=>!q||s.name.includes(q)||s.code.includes(q));
   const sub=cartTotal(), vat=Math.round(sub*14/114), items=S.cart.reduce((a,c)=>a+c.qty,0);
   return `<div class="sechead"><div><h2>البيع — فرع ${esc(b.name)}</h2><span class="sub">اضغط على الصنف لاختيار المقاس واللون</span></div>
-    <input class="srch" id="sq2" placeholder="ابحث عن صنف..." value="${esc(S.sq)}"></div>
+    <div class="row" style="gap:8px">
+      <input class="srch" id="sq2" placeholder="ابحث عن صنف..." value="${esc(S.sq)}">
+      <button class="btn btn-sm" id="hw-btn">ربط الأجهزة بالفرع</button>
+    </div></div>
+  <div class="notice"><span>🔌</span><div>الماسح الضوئي يعمل مباشرةً كأنه لوحة مفاتيح: امسح الباركود فيُضاف الصنف للفاتورة فوراً. اضغط <b>ربط الأجهزة بالفرع</b> لمعرفة كيف تتصل الطابعة والدرج وباقي الأجهزة.</div></div>
   <div class="poswrap">
     <div class="pgrid">${list.map(s=>{ const av=branchQty(S.branch,s.code);
       return `<button class="pcard" data-p="${s.code}" ${av===0?'disabled style="opacity:.5"':''}>
@@ -1656,8 +1795,82 @@ function viewLog(){
     </tbody></table></div>`;
 }
 
+/* ---------- شرح ربط الأجهزة بالفرع ---------- */
+function hwDiagram(){
+  return `<figure style="margin:0"><div style="overflow-x:auto; background:var(--surface-2);
+      border:1px solid var(--line); border-radius:10px; padding:16px">
+    <svg viewBox="0 0 900 450" role="img" style="display:block; width:100%; height:auto; color:var(--ink)"
+      aria-label="الماسح يتصل بجهاز الكاشير كلوحة مفاتيح، والكاشير يرسل الفاتورة إلى الطابعة، والطابعة تفتح درج النقدية، والكاشير يتزامن مع الخادم السحابي.">
+      <defs><marker id="hwA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker></defs>
+
+      <rect x="325" y="16" width="250" height="72" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+      <text x="450" y="46" text-anchor="middle" font-size="15" font-weight="700" fill="currentColor">الخادم السحابي</text>
+      <text x="450" y="68" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">المخزون · الحسابات · كل الفروع</text>
+
+      <line x1="450" y1="94" x2="450" y2="146" stroke="currentColor" stroke-width="1.4"
+        marker-start="url(#hwA)" marker-end="url(#hwA)"></line>
+      <text x="466" y="118" font-size="11.5" fill="currentColor" opacity="0.75">إنترنت — ويعمل دون اتصال عند الانقطاع</text>
+
+      <rect x="325" y="152" width="250" height="96" rx="8" fill="none" stroke="currentColor" stroke-width="2"></rect>
+      <text x="450" y="182" text-anchor="middle" font-size="15" font-weight="700" fill="currentColor">جهاز الكاشير</text>
+      <text x="450" y="204" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">حاسوب صغير أو تابلت</text>
+      <text x="450" y="226" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.55">شاشة البيع تعمل عليه</text>
+
+      <rect x="636" y="156" width="248" height="88" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+      <text x="760" y="186" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">ماسح الباركود</text>
+      <text x="760" y="208" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">USB أو بلوتوث</text>
+      <text x="760" y="228" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.55">بلا تعريفات — يكتب كلوحة مفاتيح</text>
+      <line x1="630" y1="200" x2="581" y2="200" stroke="currentColor" stroke-width="1.4" marker-end="url(#hwA)"></line>
+
+      <rect x="16" y="156" width="248" height="88" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+      <text x="140" y="186" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">طابعة الفواتير</text>
+      <text x="140" y="208" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">حرارية ٨٠ مم · ESC/POS</text>
+      <text x="140" y="228" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.55">USB أو شبكة</text>
+      <line x1="319" y1="200" x2="270" y2="200" stroke="currentColor" stroke-width="1.4" marker-end="url(#hwA)"></line>
+
+      <line x1="140" y1="250" x2="140" y2="300" stroke="currentColor" stroke-width="1.4" marker-end="url(#hwA)"></line>
+      <text x="156" y="278" font-size="11.5" fill="currentColor" opacity="0.75">كابل RJ11</text>
+      <rect x="16" y="306" width="248" height="84" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+      <text x="140" y="336" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">درج النقدية</text>
+      <text x="140" y="358" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">يفتح بأمر من الطابعة</text>
+      <text x="140" y="378" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.55">لا يتصل بالحاسوب مباشرة</text>
+
+      <rect x="636" y="306" width="248" height="84" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"
+        stroke-dasharray="5 4"></rect>
+      <text x="760" y="336" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">طابعة ملصقات الباركود</text>
+      <text x="760" y="358" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.7">في المخزن الرئيسي</text>
+      <text x="760" y="378" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.55">ملصق لكل مقاس ولون</text>
+
+      <text x="450" y="424" text-anchor="middle" font-size="11.5" fill="currentColor" opacity="0.6">
+        كل فرع نسخة مطابقة من هذه المنظومة</text>
+    </svg></div>
+    <figcaption class="sub" style="margin-top:10px">الدرج لا يتصل بالحاسوب: الطابعة هي التي تفتحه لحظة طباعة الفاتورة، فلا يُفتح إلا ببيع مسجَّل.</figcaption>
+  </figure>`;
+}
+function hwModal(){
+  const rows = [
+    ['ماسح الباركود','USB أو بلوتوث','لا شيء. يُرسل الرقم كأنه مكتوب على لوحة المفاتيح، فيلتقطه النظام ويضيف الصنف فوراً.','جاهز'],
+    ['طابعة الفواتير','USB أو شبكة محلية','طابعة حرارية ٨٠ مم تدعم ESC/POS، مع برنامج صغير على جهاز الكاشير يحوّل الفاتورة لأوامر الطابعة.','يحتاج إعداد'],
+    ['درج النقدية','كابل RJ11 من الطابعة','يفتح بأمر تُرسله الطابعة مع كل فاتورة. لا يُفتح يدوياً دون بيع مسجَّل.','يحتاج إعداد'],
+    ['طابعة الملصقات','USB — في المخزن','لطباعة باركود كل مقاس ولون عند إدخال صنف جديد أو استلام توريد.','يحتاج إعداد'],
+    ['ماكينة الدفع بالبطاقة','مستقلة عن النظام','تبقى كما هي من البنك. الكاشير يختار «فيزا» في الفاتورة وتُطابَق الحصيلة آخر اليوم.','مستقلة'],
+    ['مُنظِّم كهرباء UPS','كهرباء','يمنع ضياع فاتورة أو بقاء الدرج مفتوحاً عند انقطاع التيار أثناء البيع.','موصى به'],
+    ['إنترنت + خط احتياطي','شبكة الفرع','الفرع يبيع دون إنترنت ويزامن عند عودة الاتصال، لكن الخط الاحتياطي يبقي التقارير لحظية.','موصى به']
+  ];
+  return `${hwDiagram()}
+  <div class="tscroll"><table>
+    <thead><tr><th>الجهاز</th><th>طريقة التوصيل</th><th>ما يلزم</th><th>الحالة</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td style="font-weight:700">${esc(r[0])}</td><td class="sub">${esc(r[1])}</td>
+      <td style="white-space:normal; max-width:420px">${esc(r[2])}</td>
+      <td><span class="badge ${r[3]==='جاهز'?'b-quiet':r[3]==='يحتاج إعداد'?'b-loud':'b-mark'}">${esc(r[3])}</span></td></tr>`).join('')}
+    </tbody></table></div>
+  <div class="notice"><span>🧰</span><div><b>التركيب في كل فرع:</b> جهاز الكاشير يُفتح عليه رابط النظام، ثم يُوصَّل الماسح (ويُجرَّب بمسح أي صنف)، ثم الطابعة، ثم الدرج بكابل الطابعة. يُثبَّت برنامج الطباعة الصغير مرة واحدة ويُضبط اسم الطابعة. زيارة واحدة لكل فرع تكفي.</div></div>
+  <div class="row" style="justify-content:flex-end"><button class="btn" onclick="document.getElementById('layer').innerHTML=''">إغلاق</button></div>`;
+}
+
 /* ---------- صور الأصناف ---------- */
-const GARMENT = '👗';
+const GARMENT = '<svg class="gl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 3 12 5.5 15.5 3 20 6l-2.5 3.5V21h-11V9.5L4 6z"/></svg>';
 function thumb(s2, big){
   const cls = big ? ' thumb-lg' : '';
   return s2 && s2.img
@@ -1711,6 +1924,28 @@ function gridHTML(code,bid,clickable,withCodes){
       <td class="n">${AR(val(z,cl))}</td></tr>`)).join('')}</tbody></table></div>` : '' }`;
 }
 
+function labelSheet(code){
+  const s2=styleBy(code);
+  const cells = s2.colors.flatMap(cl=> s2.sizes.map(sz=>({sz,cl})));
+  return `<p class="sub">معاينة ورقة الملصقات لـ <b>${esc(s2.name)}</b> — ملصق لكل مقاس ولون، تُطبع على طابعة الملصقات في المخزن.</p>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px">
+    ${cells.map(v=>`<div style="border:1px solid var(--line-2); border-radius:6px; padding:8px 10px;
+        display:flex; flex-direction:column; gap:3px; background:var(--surface)">
+      <span style="font-size:12px; font-weight:700">${esc(s2.name)}</span>
+      <span class="sub" style="font-size:11px">${v.sz} · ${esc(v.cl)}</span>
+      <span class="code" style="font-size:10.5px">${sku(s2,v.sz,v.cl)}</span>
+      <div style="display:flex; gap:1px; height:26px; align-items:flex-end; margin-top:2px">
+        ${bcode(s2,v.sz,v.cl).split('').map((d,i)=>`<span style="display:block; width:${1+(+d%3)}px;
+          height:${60+(+d*4)}%; background:var(--ink)"></span>`).join('')}
+      </div>
+      <span class="code" style="font-size:10px; letter-spacing:1px">${bcode(s2,v.sz,v.cl)}</span>
+      <span style="font-size:11.5px; font-weight:700">${EGP(s2.price)}</span>
+    </div>`).join('')}
+  </div>
+  <div class="notice"><span>🖨️</span><div>في النظام الحقيقي يُرسَل هذا مباشرةً إلى طابعة الملصقات، ويمكن تحديد عدد الملصقات لكل متغيّر حسب الكمية المستلمة.</div></div>
+  <div class="row" style="justify-content:flex-end"><button class="btn" onclick="document.getElementById('layer').innerHTML=''">إغلاق</button></div>`;
+}
+
 function openModal(title, body, keepState){
   $('#layer').innerHTML=`<div class="ovl" id="ovl"><div class="modal wide" role="dialog" aria-modal="true">
     <div class="modal-h"><h3 style="font-size:17px">${title}</h3><button class="xbtn" id="mx" aria-label="إغلاق" style="font-size:22px">×</button></div>
@@ -1758,12 +1993,19 @@ function wire(){
 
   /* المخزن */
   const wn=$('#w-new'); if(wn) wn.onclick=()=>{ S.NI=null; openNewItem(); };
+  const wc=$('#w-clone'); if(wc) wc.onclick=()=>{ openModal('نسخ صنف موجود', cloneForm());
+    $('#cl-cancel').onclick=()=>{ $('#layer').innerHTML=''; };
+    $('#cl-go').onclick=()=>{ const src=$('#cl-src').value; $('#layer').innerHTML=''; S.NI=null; openNewItem(src); }; };
+  const wi=$('#w-import'); if(wi) wi.onclick=()=> openImport();
+  document.querySelectorAll('[data-lbl]').forEach(b=> b.onclick=(e)=>{ e.stopPropagation();
+    openModal('ملصقات الباركود', labelSheet(b.dataset.lbl)); });
   document.querySelectorAll('[data-wf]').forEach(b=> b.onclick=()=> openWF(b.dataset.wf));
   document.querySelectorAll('tr[data-s]').forEach(r=> r.onclick=()=>{ const s=styleBy(r.dataset.s);
     openModal(esc(s.name)+' <span class="code">'+s.code+'</span>',
       `<div class="row" style="gap:14px; align-items:flex-start">${thumb(s,true)}
          <p class="sub" style="flex:1; min-width:0">${esc(s.cat)} · ${esc(s.season)}<br>المورّد ${esc(s.supplier)}<br>تكلفة ${EGP(s.cost)} · بيع ${EGP(s.price)}</p></div>
        ${gridHTML(s.code,null,false,true)}
+       <div class="row"><button class="btn btn-sm" data-lbl="${s.code}">ملصقات الباركود</button></div>
        <h4 style="font-size:14px">التوزيع على الفروع</h4>
        <div class="tscroll"><table><thead><tr><th>الفرع</th><th>الكمية</th><th>حد الطلب</th><th>قيمة المخزون</th><th>الحالة</th></tr></thead>
        <tbody>${BRANCHES.map(b=>{ const q=branchQty(b.id,s.code);
@@ -1808,6 +2050,7 @@ function wire(){
       by:(BRANCHES.find(b=>b.id===bid)||{}).manager });
     DAILY[bid][DAILY[bid].length-1].total += total;
     S.cart=[]; render(); toast('تم إتمام البيع · '+EGP(total)); };
+  const hb=$('#hw-btn'); if(hb) hb.onclick=()=> openModal('ربط الأجهزة بالفرع', hwModal());
   const nr=$('#newret'); if(nr) nr.onclick=()=>{
     openModal('تسجيل مرتجع', `<p class="sub">في النظام الحقيقي يُبحث برقم الفاتورة ثم يُختار الصنف المرتجع.</p>
       <div class="stack-s"><input class="srch" style="max-width:none; width:100%" placeholder="رقم الفاتورة — مثال INV-٠٣-٤١٢٧">
