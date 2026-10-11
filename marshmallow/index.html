@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="نسخة تجريبية لنظام Marshmallow — إدارة رئيسية ومخزن ومحاسبة وتقارير وخمسة عشر فرعاً. بيانات وهمية بالكامل.">
+  <meta name="author" content="Ghassan Mazen">
+  <meta name="copyright" content="© 2026 Ghassan Mazen. All rights reserved.">
   <meta name="robots" content="noindex">
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%23141416%27%2F%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%276%27%20fill%3D%27%23fff%27%2F%3E%3C%2Fsvg%3E">
   <style>
@@ -14,6 +16,11 @@
     img { max-width: 100%; }
     [hidden] { display: none !important; }
   </style>
+<!--
+  Marshmallow — Retail Management System (demonstration build)
+  © 2026 Ghassan Mazen. All rights reserved.
+  جميع الحقوق محفوظة — غسان مازن
+-->
 <title>Marshmallow</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Tajawal:wght@400;500;700&display=swap">
 <style>
@@ -203,6 +210,19 @@
     color:var(--ink); min-width:180px; }
   .backlink { border:none; background:none; color:var(--ink); font-weight:700; padding:0; font-size:14px; text-decoration:underline; text-underline-offset:3px; }
 
+  /* ختم حقوق الملكية — زاوية ثابتة، باهت ولا يعترض أي ضغطة */
+  .copyright {
+    position: fixed; left: 14px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    z-index: 5; pointer-events: none;
+    font-size: 10.5px; line-height: 1.5; letter-spacing: .04em;
+    color: var(--ink-3); opacity: .45; text-align: left; direction: ltr;
+  }
+  .copyright b { font-weight: 600; letter-spacing: .07em; }
+  .copyright span { display: block; direction: rtl; letter-spacing: 0; font-size: 9.5px; }
+  @media (max-width: 600px) { .copyright { font-size: 9px; opacity: .38; } }
+  @media print { .copyright { opacity: .7; } }
+
   /* صور الأصناف */
   .thumb { width:44px; height:52px; border-radius:7px; object-fit:cover; display:block;
     border:1px solid var(--line); background:var(--surface-2); }
@@ -272,6 +292,7 @@
 <nav class="tabrow" id="tabs" role="tablist"></nav>
 <div class="wrap"><div id="view" class="stack"></div></div>
 <div id="layer"></div>
+<div class="copyright">© 2026 <b>Ghassan Mazen</b><span>جميع الحقوق محفوظة</span></div>
 
 <script>
 /* ============================================================

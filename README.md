@@ -168,3 +168,8 @@ js/store.js         data access layer — unchanged from production
 js/app.js           application logic — unchanged from production
 js/demo.js          demo-only behaviour (auto-approve, quick login, reset)
 ```
+
+---
+
+© 2026 Ghassan Mazen. All rights reserved.
+جميع الحقوق محفوظة — غسان مازن
