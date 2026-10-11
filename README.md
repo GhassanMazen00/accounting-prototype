@@ -29,8 +29,11 @@ Open it and use the switcher at the top. It has four workstations, one per role:
 
 - **شاشة الفرع → البيع** — tap a garment and the size × colour grid opens showing that
   branch's availability. Pick a cell, build the invoice, complete the sale. Stock drops.
-- **شاشة المخزن → الأصناف → + صنف جديد** — name an item, tap sizes and colours, set cost
-  and price. The variant matrix, codes and barcodes generate as you type.
+- **شاشة المخزن → الأصناف** — three ways to code an item: **+ صنف جديد** with the
+  category's size/colour template already applied, **نسخ صنف موجود** which copies
+  everything but the name, or **استيراد من ملف** for bulk CSV entry with a validated
+  per-row preview. Codes and barcodes generate as you type, or you can code against the
+  supplier's existing barcode instead.
 - **شاشة المخزن → التحويلات** — move stock between the main warehouse and a branch.
   Both sides update, and the movement appears in the admin's movement log.
 - **شاشة المحاسب → قيود اليومية → + قيد يدوي** — save stays disabled until debits equal
@@ -40,8 +43,11 @@ Open it and use the switcher at the top. It has four workstations, one per role:
 - **الإدارة الرئيسية → التقارير** — goods shipped to each branch per day, sales against
   returns per branch, a running current-account statement per branch, and an item
   tracker that finds any style's quantity in all sixteen locations at once.
-- **شاشة المخزن → + صنف جديد → صورة الصنف** — attach a photo; it is downscaled in the
-  browser and then appears in the stock table and on the till.
+- **شاشة المخزن → أي صنف → ملصقات الباركود** — a printable label sheet, one label per
+  size/colour, for the warehouse label printer. Items also take a photo, downscaled in
+  the browser, which then shows in the stock table and on the till.
+- **شاشة الفرع → البيع → ربط الأجهزة بالفرع** — a diagram and device-by-device checklist
+  of how the scanner, receipt printer, cash drawer and label printer connect in a shop.
 
 ### How it is built
 
